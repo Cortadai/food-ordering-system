@@ -5,6 +5,7 @@ target/
 
 ### IntelliJ IDEA ###
 .idea/
+*.iml
 
 ### Eclipse ###
 .apt_generated
@@ -30,3 +31,10 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+# Kafka Docker volumes (keep folders but ignore contents)
+infrastructure/docker-compose/volumes/kafka/**/*
+!infrastructure/docker-compose/volumes/kafka/**/.gitkeep
+
+infrastructure/docker-compose/volumes/zookeeper/**/*
+!infrastructure/docker-compose/volumes/zookeeper/**/.gitkeep

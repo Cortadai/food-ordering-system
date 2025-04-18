@@ -1,159 +1,160 @@
-## 🧭 Estructura general del módulo `order-service`
+# 🧩 order-application-service
 
-Este módulo sigue la **Arquitectura Hexagonal** y se divide en:
+> Este submódulo representa **la capa de aplicación del dominio** para el microservicio de pedidos.
 
-### 1. **DTOs (`dto`)**
-Son los objetos que viajan entre el mundo exterior (clientes, APIs, mensajería) y el interior del dominio.
-
-- `create` → para crear un pedido:
-    - `CreateOrderCommand` (input)
-    - `CreateOrderResponse` (output)
-    - `OrderItem` (input)
-    - `OrderAddress` (input)
-
-- `track` → para consultar el estado de un pedido:
-    - `TrackOrderQuery`
-    - `TrackOrderResponse`
-
-- `message` → para mensajes entrantes desde otros servicios:
-    - `PaymentResponse`
-    - `RestaurantApprovalResponse`
+> Aquí se encuentran los **input ports**, servicios de aplicación, mapeadores, y adaptadores para eventos de dominio.
 
 ---
 
-### 2. **Value Objects compartidos** (en el módulo `common-domain`)
-Se han creado dos nuevos enums reutilizables:
+## 📦 Estructura de paquetes
 
-- `PaymentStatus { COMPLETED, CANCELLED, FAILED }`
-- `OrderApprovalStatus { APPROVED, REJECTED }`
-
----
-
-### 3. **Data Mapper**
-Paquete: `mapper`
-
-- Clase `OrderDataMapper`: convierte entre DTOs y entidades del dominio (`Order`, `OrderItem`, etc.)
-
----
-
-### 4. **Hexagonal Architecture Ports**
-
-#### 🡢 *Input Ports* (interfaces que define el dominio para ser usadas desde el exterior)
-
-Paquete: `ports.input`
-
-- `OrderApplicationService`
-    - `createOrder(CreateOrderCommand)`
-    - `trackOrder(TrackOrderQuery)`
-
-- `PaymentResponseMessageListener`
-    - `paymentCompleted(PaymentResponse)`
-    - `paymentCancelled(PaymentResponse)`
-
-- `RestaurantApprovalResponseMessageListener`
-    - `orderApproved(RestaurantApprovalResponse)`
-    - `orderRejected(RestaurantApprovalResponse)`
-
----
-
-#### 🡠 *Output Ports* (interfaces que el dominio necesita implementar hacia el exterior)
-
-Paquete: `ports.output`
-
-- `repository`
-    - `OrderRepository`
-    - `RestaurantRepository`
-    - `CustomerRepository`
-
-- `message.publisher`
-    - `OrderCreatedPaymentRequestMessagePublisher`
-    - `OrderCancelledPaymentRequestMessagePublisher`
-    - `OrderPaidRestaurantRequestMessagePublisher`
-
----
-
-### 5. **Interfaces de publicación de eventos**
-
-En `common-domain.events.publisher`:
-
-```java
-public interface DomainEventPublisher<T extends DomainEvent> {
-    void publish(T domainEvent);
-}
+```text
+order-application-service
+└── src
+    └── main
+        └── java
+            └── com.food.ordering.system.order.service.domain
+                ├── dto
+                │   ├── create
+                │   ├── track
+                │   └── message
+                ├── mapper
+                ├── port
+                │   ├── input
+                │   │   ├── service
+                │   │   └── message.listener
+                │   │       ├── payment
+                │   │       └── restaurant
+                │   └── output
+                │       ├── repository
+                │       └── message.publisher
+                │           ├── payment
+                │           └── restaurant
+                ├── config
+                └── service
 ```
 
-Luego se crean subinterfaces específicas, que simplemente extienden esta interfaz con tipos concretos como `OrderCreatedEvent`, `OrderCancelledEvent`...
+---
+
+## 🎯 Responsabilidades clave
+
+- Recibir comandos y queries del cliente (input ports)
+- Coordinar validaciones y lógica del dominio
+- Manejar transacciones
+- Publicar eventos de dominio (pero no crearlos)
 
 ---
 
-Perfecto, vamos a ir desarrollando esas cuatro preguntas en notas bien estructuradas. Aquí tienes la primera versión del resumen para ayudarte a asentar los conceptos:
+## 🎒 Paquete `dto`
+
+Contiene clases de transferencia de datos:
+
+- `CreateOrderCommand`, `CreateOrderResponse`
+- `TrackOrderQuery`, `TrackOrderResponse`
+- `PaymentResponse`, `RestaurantApprovalResponse`
+
+Estas clases usan anotaciones de Lombok y validaciones con `@NotNull`, `@Size`, etc.
 
 ---
 
-## 🧩 Comprendiendo la arquitectura del módulo `order-service`
+## 🔁 Paquete `mapper`
 
-### 1️⃣ ¿Qué es un **input port** y cómo se usa?
+### `OrderDataMapper`
 
-Un **input port** (puerto de entrada) es una **interfaz pública** expuesta por la aplicación para permitir que agentes externos (como controladores HTTP o listeners de eventos) **interactúen con la lógica de negocio**.
+Contiene métodos para:
 
-- En este módulo, los input ports están definidos en `order.service.domain.ports.input`.
-- Ejemplos:
-    - `OrderApplicationService`: expuesto a controladores REST. Tiene métodos como `createOrder()` y `trackOrder()`.
-    - `PaymentResponseMessageListener`: invocado por eventos de respuesta del servicio de pagos.
-    - `RestaurantApprovalResponseMessageListener`: invocado por eventos de aprobación del restaurante.
-
-> 💡 Piensa en ellos como **interfaces de comunicación autorizadas hacia la lógica del sistema**.
+- Convertir DTOs a entidades del dominio (`CreateOrderCommand → Order`)
+- Convertir entidades a respuestas (`Order → CreateOrderResponse`, `Order → TrackOrderResponse`)
+- Convertir `CreateOrderCommand → Restaurant` con solo productIds (para validación)
 
 ---
 
-### 2️⃣ ¿Qué rol juega cada **repositorio**?
+## 🧪 Paquete `port`
 
-Los **puertos de salida** (output ports) en el paquete `order.service.domain.ports.output.repository` representan las necesidades que tiene la aplicación para **acceder a datos persistentes**.
+### 📥 `input`
 
-Son interfaces que luego implementarán los adaptadores de infraestructura (usando JPA, JDBC, etc).
+#### `OrderApplicationService`
 
-- `OrderRepository`:
-    - `save(Order order)`: guarda una orden.
-    - `findByTrackingId(UUID trackingId)`: recupera una orden por ID de seguimiento.
-- `RestaurantRepository`:
-    - `findRestaurantInformation(Restaurant restaurant)`: busca los datos del restaurante y sus productos (por ID).
-- `CustomerRepository`:
-    - `findCustomer(UUID customerId)`: comprueba si el cliente existe.
+- Input port principal.
+- Define métodos:
+  - `createOrder(CreateOrderCommand)`
+  - `trackOrder(TrackOrderQuery)`
 
-> 💡 El dominio **solicita información** a través de estas interfaces, sin saber cómo están implementadas.
+#### `PaymentResponseMessageListener`
+- Define:
+  - `paymentCompleted(PaymentResponse)`
+  - `paymentCancelled(PaymentResponse)`
+
+#### `RestaurantApprovalResponseMessageListener`
+- Define:
+  - `orderApproved(RestaurantApprovalResponse)`
+  - `orderRejected(RestaurantApprovalResponse)`
+
+### 📤 `output`
+
+#### `repository`
+
+- `OrderRepository`, `CustomerRepository`, `RestaurantRepository`
+- Interfaz para acceder a datos desde la infraestructura
+
+#### `message.publisher`
+
+- Publicadores de eventos:
+  - `OrderCreatedPaymentRequestMessagePublisher`
+  - `OrderCancelledPaymentRequestMessagePublisher`
+  - `OrderPaidRestaurantRequestMessagePublisher`
+
+Todos extienden una interfaz genérica `DomainEventPublisher<T>`
+
+---
+
+## 🧠 Paquete `service`
+
+### `OrderApplicationServiceImpl`
+
+- Implementa `OrderApplicationService`
+- Llama a `OrderCreateCommandHandler` y `OrderTrackCommandHandler`
+
+### `OrderCreateCommandHandler`
+
+- Orquesta:
+  - Validación de existencia de cliente
+  - Validación del restaurante
+  - Conversión DTO → entidad
+  - Llamada a `OrderDomainService`
+  - Persistencia
+  - Publicación de evento
+
+### `OrderTrackCommandHandler`
+
+- Lógica simple:
+  - Buscar orden por `trackingId`
+  - Convertir a DTO
+
+### `OrderCreateHelper`
+
+- Extrae la lógica transaccional en un método separado (por limitaciones del proxy de Spring y `@Transactional`)
+- Permite asegurar que el evento se publica **solo tras persistencia exitosa**
 
 ---
 
-### 3️⃣ ¿Cómo fluyen los datos desde un cliente hasta que llegan al dominio?
+## 🧩 Eventos y transacciones
 
-1. 🧍 El **cliente externo** (Postman, Front-End, etc.) realiza una solicitud HTTP, por ejemplo, `POST /orders`.
+Se presentan dos enfoques para publicar eventos:
 
-2. 📦 Un **controlador REST** (aún por crear) convierte la solicitud HTTP en un `CreateOrderCommand` (DTO).
+1. **Publicar desde el servicio de aplicación** después de `@Transactional` → más directo
+2. **Usar `@TransactionalEventListener`** para reaccionar tras el commit
 
-3. 🧠 El DTO se **valida** automáticamente gracias a anotaciones como `@NotNull` y `@Valid`.
-
-4. 🔌 El controlador **invoca un input port**, como `OrderApplicationService.createOrder()`.
-
-5. 🎯 La implementación del input port:
-    - Usa el **OrderDataMapper** para convertir el `CreateOrderCommand` en entidades del dominio (`Order`, `OrderItem`, etc.).
-    - Llama al `OrderDomainService` para ejecutar la lógica de negocio.
-    - Usa los **repositorios** para consultar o guardar datos.
-    - Devuelve un `CreateOrderResponse` como DTO al cliente.
+Se opta por el primer enfoque, delegando publicación a interfaces `DomainEventPublisher<T>`.
 
 ---
 
-### 4️⃣ ¿Cómo se activan los eventos desde la aplicación?
+## ✅ Conclusión
 
-- El **dominio** genera los eventos (`OrderCreatedEvent`, `OrderPaidEvent`, etc.), pero **no los dispara** directamente.
-- El **servicio de aplicación** es quien recibe el evento como retorno del `OrderDomainService`.
-- Luego usa un **publisher** (de `order.service.domain.ports.output.message.publisher`) para publicarlo:
+`order-application-service` orquesta la ejecución del caso de uso `createOrder` y `trackOrder`, respetando los principios de Clean Architecture:
 
-```java
-orderCreatedPaymentRequestMessagePublisher.publish(orderCreatedEvent);
-```
+- Lógica de negocio en el dominio
+- Infraestructura desacoplada por interfaces
+- Input/Output Ports bien definidos
 
-Cada publisher implementa la interfaz genérica `DomainEventPublisher<T>`, lo que permite desacoplar la publicación real (Kafka, RabbitMQ, etc.).
-
-> 💡 Así aseguramos que primero se guarda el estado en base de datos y luego se publica el evento, evitando inconsistencias.
-
----
+Es el lugar donde se define **qué se hace**, pero no **cómo se guarda o publica**. Es el cerebro coordinador del microservicio.

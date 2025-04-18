@@ -11,4 +11,16 @@ A continuación vemos cómo sacar un gráfico con las dependencias del proyecto
 mvn com.github.ferstl:depgraph-maven-plugin:4.0.3:aggregate -DcreateImage=true -DreduceEdges=false -Dscope=compile "-Dincludes=com.food.ordering.system*:*"
 ```
 
+---
+---
+
+Como instalar y usar kafkacat
+
+``` 
+sudo apt-get install kafkacat
+```
+
+``` 
+kafkacat -C -b localhost:19092 -t payment-request
+```
 

@@ -32,9 +32,12 @@ build/
 ### Mac OS ###
 .DS_Store
 
-# Kafka Docker volumes (keep folders but ignore contents)
+# Docker volumes (keep folders but ignore contents)
 infrastructure/docker-compose/volumes/kafka/**/*
 !infrastructure/docker-compose/volumes/kafka/**/.gitkeep
 
 infrastructure/docker-compose/volumes/zookeeper/**/*
 !infrastructure/docker-compose/volumes/zookeeper/**/.gitkeep
+
+infrastructure/docker-compose/volumes/database/**/*
+!infrastructure/docker-compose/volumes/database/**/.gitkeep

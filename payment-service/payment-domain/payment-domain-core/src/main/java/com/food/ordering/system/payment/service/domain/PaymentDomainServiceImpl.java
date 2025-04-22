@@ -41,7 +41,7 @@ public class PaymentDomainServiceImpl implements PaymentDomainService{
 
         if(failureMessages.isEmpty()){
             log.info("Payment is initialized successfully for order id: {}", payment.getOrderId().getValue());
-            payment.updateStatus(PaymentStatus.CANCELLED);
+            payment.updateStatus(PaymentStatus.COMPLETED);
             return new PaymentCompletedEvent(payment, ZonedDateTime.now(ZoneId.of(UTC)),
                     paymentCompletedEventDomainEventPublisher);
         } else {

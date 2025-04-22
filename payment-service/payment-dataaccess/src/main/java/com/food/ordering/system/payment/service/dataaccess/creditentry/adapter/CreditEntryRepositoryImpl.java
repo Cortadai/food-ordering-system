@@ -32,7 +32,7 @@ public class CreditEntryRepositoryImpl implements CreditEntryRepository {
     public Optional<CreditEntry> findByCustomerId(CustomerId customerId) {
         return creditEntryJpaRepository
                 .findByCustomerId(customerId.getValue())
-                .map(creditEntryDataAccessMapper::creditEntryEntityToCreditEntry);
+                .map(creditEntryEntity -> creditEntryDataAccessMapper.creditEntryEntityToCreditEntry(creditEntryEntity));
     }
 
 }

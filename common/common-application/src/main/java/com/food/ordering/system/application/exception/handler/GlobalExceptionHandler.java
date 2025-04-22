@@ -53,7 +53,7 @@ public class GlobalExceptionHandler {
     private String extractViolationsFromException(ConstraintViolationException validationException) {
         return validationException.getConstraintViolations()
                 .stream()
-                .map(ConstraintViolation::getMessage)
+                .map(constraintViolation -> constraintViolation.getMessage())
                 .collect(Collectors.joining("--"));
     }
 

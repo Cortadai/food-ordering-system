@@ -8,7 +8,7 @@ DROP TYPE IF EXISTS payment_status;
 
 CREATE TYPE payment_status AS ENUM ('COMPLETED', 'CANCELLED', 'FAILED');
 
-DROP TABLE IF EXISTS "order".orders CASCADE;
+DROP TABLE IF EXISTS "payment".payments CASCADE;
 
 CREATE TABLE "payment".payments
 (

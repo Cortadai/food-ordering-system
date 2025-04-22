@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- Reglas de conversión para soporte de colores y trazas bonitas -->
+    <conversionRule conversionWord="clr" converterClass="org.springframework.boot.logging.logback.ColorConverter"/>
+    <conversionRule conversionWord="wEx" converterClass="org.springframework.boot.logging.logback.ExtendedWhitespaceThrowableProxyConverter"/>
+
+    <!-- Patrón bonito de Spring Boot con colores -->
+    <property name="CONSOLE_LOG_PATTERN" value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr(${PID}){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n%wEx"/>
+
+    <!-- Nombre y ubicación de fichero de logs -->
+    <property name="LOG_PATH" value="zlogs" />
+    <property name="APP_NAME" value="payment-service" />
+
+    <!-- Appender de consola con colores -->
+    <appender name="Console" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- Appender de fichero -->
+    <appender name="FileAppender" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/${APP_NAME}.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- daily rollover -->
+            <fileNamePattern>${LOG_PATH}/${APP_NAME}.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>7</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Nivel de log por defecto: INFO (para librerías externas, etc) -->
+    <root level="INFO">
+        <appender-ref ref="Console"/>
+        <appender-ref ref="FileAppender"/>
+    </root>
+
+    <!-- Nivel DEBUG solo para tus clases -->
+    <logger name="com.food.ordering.system" level="DEBUG" additivity="false">
+        <appender-ref ref="Console"/>
+        <appender-ref ref="FileAppender"/>
+    </logger>
+
+</configuration>

@@ -1,6 +1,7 @@
 server:
   port: 8183
 
+# this property is being override by the logback-spring.xml file
 logging:
   level:
     com.food.ordering.system: DEBUG

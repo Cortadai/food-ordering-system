@@ -32,6 +32,9 @@ build/
 ### Mac OS ###
 .DS_Store
 
+### Logs ###
+zlogs/*
+
 # Docker volumes (keep folders but ignore contents)
 infrastructure/docker-compose/volumes/kafka/**/*
 !infrastructure/docker-compose/volumes/kafka/**/.gitkeep
@@ -41,3 +44,6 @@ infrastructure/docker-compose/volumes/zookeeper/**/*
 
 infrastructure/docker-compose/volumes/database/**/*
 !infrastructure/docker-compose/volumes/database/**/.gitkeep
+
+infrastructure/docker-compose/volumes/logstash/**/*
+!infrastructure/docker-compose/volumes/logstash/**/.gitkeep

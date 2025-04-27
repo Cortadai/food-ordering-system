@@ -19,7 +19,7 @@ public class RestaurantApprovalRequest {
     private String sagaId;
     private String restaurantId;
     private String orderId;
-    private RestaurantOrderStatus restaurantOderStatus;
+    private RestaurantOrderStatus restaurantOrderStatus;
     private List<Product> products;
     private BigDecimal price;
     private Instant createdAt;

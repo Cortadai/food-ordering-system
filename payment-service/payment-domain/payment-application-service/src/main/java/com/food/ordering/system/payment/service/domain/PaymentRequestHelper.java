@@ -1,16 +1,20 @@
 package com.food.ordering.system.payment.service.domain;
 
 import com.food.ordering.system.domain.valueobject.CustomerId;
+import com.food.ordering.system.domain.valueobject.PaymentStatus;
+import com.food.ordering.system.outbox.OutboxStatus;
 import com.food.ordering.system.payment.service.domain.dto.PaymentRequest;
 import com.food.ordering.system.payment.service.domain.entity.CreditEntry;
 import com.food.ordering.system.payment.service.domain.entity.CreditHistory;
 import com.food.ordering.system.payment.service.domain.entity.Payment;
 import com.food.ordering.system.payment.service.domain.event.PaymentEvent;
 import com.food.ordering.system.payment.service.domain.exception.PaymentApplicationServiceException;
+import com.food.ordering.system.payment.service.domain.exception.PaymentNotFoundException;
 import com.food.ordering.system.payment.service.domain.mapper.PaymentDataMapper;
-import com.food.ordering.system.payment.service.domain.ports.output.message.publisher.PaymentCancelledMessagePublisher;
-import com.food.ordering.system.payment.service.domain.ports.output.message.publisher.PaymentCompletedMessagePublisher;
-import com.food.ordering.system.payment.service.domain.ports.output.message.publisher.PaymentFailedMessagePublisher;
+import com.food.ordering.system.payment.service.domain.outbox.model.OrderEventPayload;
+import com.food.ordering.system.payment.service.domain.outbox.model.OrderOutboxMessage;
+import com.food.ordering.system.payment.service.domain.outbox.scheduler.OrderOutboxHelper;
+import com.food.ordering.system.payment.service.domain.ports.output.message.publisher.PaymentResponseMessagePublisher;
 import com.food.ordering.system.payment.service.domain.ports.output.repository.CreditEntryRepository;
 import com.food.ordering.system.payment.service.domain.ports.output.repository.CreditHistoryRepository;
 import com.food.ordering.system.payment.service.domain.ports.output.repository.PaymentRepository;
@@ -18,7 +22,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
+import javax.sql.DataSource;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -29,62 +37,64 @@ public class PaymentRequestHelper {
     private final PaymentRepository paymentRepository;
     private final CreditEntryRepository creditEntryRepository;
     private final CreditHistoryRepository creditHistoryRepository;
-    private final PaymentCompletedMessagePublisher paymentCompletedEventDomainEventPublisher;
-    private final PaymentCancelledMessagePublisher paymentCancelledEventDomainEventPublisher;
-    private final PaymentFailedMessagePublisher paymentFailedEventDomainEventPublisher;
+    private final OrderOutboxHelper orderOutboxHelper;
+    private final PaymentResponseMessagePublisher paymentResponseMessagePublisher;
 
     public PaymentRequestHelper(CreditEntryRepository creditEntryRepository,
                                 PaymentDomainService paymentDomainService,
                                 PaymentDataMapper paymentDataMapper,
                                 PaymentRepository paymentRepository,
                                 CreditHistoryRepository creditHistoryRepository,
-                                PaymentCompletedMessagePublisher paymentCompletedEventDomainEventPublisher,
-                                PaymentCancelledMessagePublisher paymentCancelledEventDomainEventPublisher,
-                                PaymentFailedMessagePublisher paymentFailedEventDomainEventPublisher) {
+                                OrderOutboxHelper orderOutboxHelper,
+                                PaymentResponseMessagePublisher paymentResponseMessagePublisher) {
         this.creditEntryRepository = creditEntryRepository;
         this.paymentDomainService = paymentDomainService;
         this.paymentDataMapper = paymentDataMapper;
         this.paymentRepository = paymentRepository;
         this.creditHistoryRepository = creditHistoryRepository;
-        this.paymentCompletedEventDomainEventPublisher = paymentCompletedEventDomainEventPublisher;
-        this.paymentCancelledEventDomainEventPublisher = paymentCancelledEventDomainEventPublisher;
-        this.paymentFailedEventDomainEventPublisher = paymentFailedEventDomainEventPublisher;
+        this.orderOutboxHelper = orderOutboxHelper;
+        this.paymentResponseMessagePublisher = paymentResponseMessagePublisher;
     }
 
     @Transactional
-    public PaymentEvent persistPayment(PaymentRequest paymentRequest) {
+    public void persistPayment(PaymentRequest paymentRequest) {
+        if(publishIfOutboxMessageProcessesForPayment(paymentRequest, PaymentStatus.COMPLETED)){
+            log.info("An outbox message with saga id: {} is already saved to database!", paymentRequest.getSagaId());
+            return;
+        }
         log.info("Received payment complete event for order id: {}", paymentRequest.getOrderId());
         Payment payment = paymentDataMapper.paymentRequestToPayment(paymentRequest);
-        return handlePayment(payment, PaymentAction.INIT);
-        /*
-        CreditEntry creditEntry = getCreditEntry(payment.getCustomerId());
-        List<CreditHistory> creditHistories = getCreditHistories(payment.getCustomerId());
-        List<String> failureMessages = new ArrayList<>();
-        PaymentEvent paymentEvent = paymentDomainService
-                .validateAndInitPayment(payment, creditEntry, creditHistories, failureMessages);
-        persistDbObject(payment, failureMessages, creditEntry, creditHistories);
-        return paymentEvent;
-         */
+        PaymentEvent paymentEvent = handlePayment(payment, PaymentAction.INIT);
+        OrderEventPayload orderEventPayload = paymentDataMapper.paymentEventToOrderEventpayload(paymentEvent);
+        orderOutboxHelper.saveOrderOutboxMessage(
+                orderEventPayload,
+                paymentEvent.getPayment().getPaymentStatus(),
+                OutboxStatus.STARTED,
+                UUID.fromString(paymentRequest.getSagaId())
+        );
     }
 
     @Transactional
-    public PaymentEvent persistCancelPayment(PaymentRequest paymentRequest) {
+    public void persistCancelPayment(PaymentRequest paymentRequest) {
+        if(publishIfOutboxMessageProcessesForPayment(paymentRequest, PaymentStatus.CANCELLED)){
+            log.info("An outbox message with saga id: {} is already saved to database!", paymentRequest.getSagaId());
+            return;
+        }
         log.info("Received payment rollback event for order id: {}", paymentRequest.getOrderId());
         Payment payment = paymentRepository.findByOrderId(UUID.fromString(paymentRequest.getOrderId()))
                 .orElseThrow(() -> {
                     log.error("Payment not found for order id: {}", paymentRequest.getOrderId());
-                    return new PaymentApplicationServiceException("Payment not found for order id: " + paymentRequest.getOrderId());
+                    return new PaymentNotFoundException(
+                            "Payment with order id: " + paymentRequest.getOrderId() + " not found!");
                 });
-        return handlePayment(payment, PaymentAction.CANCEL);
-        /*
-        CreditEntry creditEntry = getCreditEntry(payment.getCustomerId());
-        List<CreditHistory> creditHistories = getCreditHistories(payment.getCustomerId());
-        List<String> failureMessages = new ArrayList<>();
-        PaymentEvent paymentEvent = paymentDomainService
-                .validateAndCancelPayment(payment, creditEntry, creditHistories, failureMessages);
-        persistDbObject(payment, failureMessages, creditEntry, creditHistories);
-        return paymentEvent;
-         */
+        PaymentEvent paymentEvent = handlePayment(payment, PaymentAction.CANCEL);
+        OrderEventPayload orderEventPayload = paymentDataMapper.paymentEventToOrderEventpayload(paymentEvent);
+        orderOutboxHelper.saveOrderOutboxMessage(
+                orderEventPayload,
+                paymentEvent.getPayment().getPaymentStatus(),
+                OutboxStatus.STARTED,
+                UUID.fromString(paymentRequest.getSagaId())
+        );
     }
 
     private CreditEntry getCreditEntry(CustomerId customerId) {
@@ -121,11 +131,9 @@ public class PaymentRequestHelper {
 
         PaymentEvent paymentEvent = switch (action) {
             case INIT -> paymentDomainService
-                    .validateAndInitPayment(payment, creditEntry, creditHistories, failureMessages,
-                            paymentCompletedEventDomainEventPublisher, paymentFailedEventDomainEventPublisher);
+                    .validateAndInitPayment(payment, creditEntry, creditHistories, failureMessages);
             case CANCEL -> paymentDomainService
-                    .validateAndCancelPayment(payment, creditEntry, creditHistories, failureMessages,
-                            paymentCancelledEventDomainEventPublisher, paymentFailedEventDomainEventPublisher);
+                    .validateAndCancelPayment(payment, creditEntry, creditHistories, failureMessages);
         };
 
         persistDbObject(payment, failureMessages, creditEntry, creditHistories);
@@ -135,6 +143,22 @@ public class PaymentRequestHelper {
     private enum PaymentAction {
         INIT,
         CANCEL
+    }
+
+    private boolean publishIfOutboxMessageProcessesForPayment(PaymentRequest paymentRequest,
+                                                              PaymentStatus paymentStatus) {
+        Optional<OrderOutboxMessage> orderOutboxMessage = orderOutboxHelper
+                .getCompleteOrderOutboxMessageBySagaIdAndPaymentStatus(
+                        UUID.fromString(paymentRequest.getSagaId()), paymentStatus
+                );
+        if (orderOutboxMessage.isPresent()) {
+            paymentResponseMessagePublisher.publish(
+                    orderOutboxMessage.get(),
+                    (orderOutboxMessage1, outboxStatus) -> orderOutboxHelper
+                            .updateOutboxMessage(orderOutboxMessage1, outboxStatus));
+            return true;
+        }
+        return false;
     }
 
 }

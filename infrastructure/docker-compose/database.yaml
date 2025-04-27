@@ -22,3 +22,21 @@ services:
       PGADMIN_DEFAULT_PASSWORD: frescor
     volumes:
       - "./volumes/database/pgadmin-data:/var/lib/pgadmin"
+  create-gitkeep:
+    image: busybox
+    container_name: create-gitkeep-db
+    depends_on:
+      - db
+    volumes:
+      - "./volumes/database/local-pgdata:/var/lib/postgresql/data"
+    entrypoint: sh -c "
+      echo 'Esperando que Postgres termine de inicializar...';
+      sleep 15;
+      if [ ! -f /var/lib/postgresql/data/.gitkeep ]; then
+      touch /var/lib/postgresql/data/.gitkeep;
+      echo '.gitkeep creado correctamente.';
+      else
+      echo '.gitkeep ya existe.';
+      fi
+      "
+    restart: "no"

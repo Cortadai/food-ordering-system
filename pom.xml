@@ -33,6 +33,7 @@
         <spring-kafka.version>2.8.2</spring-kafka.version>
         <kafka-avro-serializer.version>7.0.1</kafka-avro-serializer.version>
         <avro-version>1.11.0</avro-version>
+        <maven-antrun-plugin.version>3.1.0</maven-antrun-plugin.version>
     </properties>
 
     <!-- Unifies the versions for dependencies in the child modules -->
@@ -179,8 +180,8 @@
     </dependencies>
 
     <build>
-        <!-- Used to compile sources of your project. -->
         <plugins>
+            <!-- Used to compile sources of your project. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -190,6 +191,68 @@
 <!--                    <source>17</source>-->
 <!--                    <target>17</target>-->
                 </configuration>
+            </plugin>
+            <!-- Plugin para limpiar carpetas específicas -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>${maven-antrun-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>kafka-clean-folders</id>
+                        <phase>none</phase> <!-- No se ejecuta solo, solo si lo llamamos -->
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target name="clean-folders">
+                                <echo>Cleaning Kafka brokers and Zookeeper folders...</echo>
+                                <delete includeemptydirs="true" failonerror="false">
+                                    <fileset dir="infrastructure/docker-compose/volumes/kafka/broker-1">
+                                        <exclude name=".gitkeep"/>
+                                    </fileset>
+                                    <fileset dir="infrastructure/docker-compose/volumes/kafka/broker-2">
+                                        <exclude name=".gitkeep"/>
+                                    </fileset>
+                                    <fileset dir="infrastructure/docker-compose/volumes/kafka/broker-3">
+                                        <exclude name=".gitkeep"/>
+                                    </fileset>
+                                    <fileset dir="infrastructure/docker-compose/volumes/zookeeper/data">
+                                        <exclude name=".gitkeep"/>
+                                    </fileset>
+                                    <fileset dir="infrastructure/docker-compose/volumes/zookeeper/transactions">
+                                        <exclude name=".gitkeep"/>
+                                    </fileset>
+                                </delete>
+                            </target>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>database-clean-folders</id>
+                        <phase>none</phase> <!-- No se ejecuta solo, solo si lo llamamos -->
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target name="clean-folders">
+                                <echo>Cleaning Postgres and PgAdmin folders...</echo>
+                                <!-- Borrar SOLO contenido dentro de local-pgdata -->
+                                <delete includeemptydirs="true" failonerror="false">
+                                    <fileset dir="infrastructure/docker-compose/volumes/database/local-pgdata">
+                                        <include name="**/*"/>
+                                    </fileset>
+                                </delete>
+                                <!-- Borrar SOLO contenido (excepto .gitkeep) dentro de pgadmin-data -->
+                                <delete includeemptydirs="true" failonerror="false">
+                                    <fileset dir="infrastructure/docker-compose/volumes/database/pgadmin-data">
+                                        <include name="**/*"/>
+                                        <exclude name=".gitkeep"/>
+                                    </fileset>
+                                </delete>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

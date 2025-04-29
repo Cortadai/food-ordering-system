@@ -2,6 +2,8 @@
 
 Microservicios con Spring Boot. Arquitectura limpia y hexagonal, DDD, SAGA, Outbox, CQRS y Kafka.
 
+![Texto alternativo](./infrastructure/assets/project-overview-section-1.png)
+
 ---
 
 ## 🚀 Build Configurations

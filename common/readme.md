@@ -51,7 +51,3 @@ Se encarga de traducir excepciones del dominio o técnicas en respuestas JSON cl
 - 🔒 **Seguridad en tipos** gracias a `BaseId` y objetos de valor.
 - 🧱 **Separación clara de capas**: el `domain` no depende de frameworks, el `application` sí.
 - ⚠️ **Manejo coherente de errores** para toda la arquitectura.
-
----
-
-¿Quieres que prepare ahora un documento general similar para `order-service` cuando terminemos con sus submódulos?

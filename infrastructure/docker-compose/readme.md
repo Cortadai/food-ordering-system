@@ -1,80 +1,111 @@
-# 🐳 `docker-compose` - Infraestructura para el entorno de desarrollo
+# 🐳 docker-compose - Infraestructura local para desarrollo
 
-Este submódulo contiene los **archivos `docker-compose.yml` y configuraciones auxiliares** necesarios para levantar los servicios externos requeridos por el sistema, como bases de datos, Kafka, Schema Registry, etc.
-
-Su propósito es facilitar el **despliegue local o en pruebas** de toda la infraestructura necesaria para ejecutar el sistema completo.
+> Este módulo define la infraestructura necesaria para ejecutar y probar el sistema de microservicios en local.  
+Utiliza múltiples archivos `docker-compose` para orquestar servicios como Kafka, PostgreSQL, Schema Registry, Zookeeper y el stack ELK.
 
 ---
 
 ## 🧱 Servicios orquestados
 
-| Servicio                     | Descripción                                                  |
-|------------------------------|--------------------------------------------------------------|
-| 🐘 PostgreSQL                | Base de datos para persistencia (por ejemplo, pedidos).      |
-| 🔑 PgAdmin                   | Dashboard para la base de datos.                             |
-| 🟠 Apache Kafka              | Broker de eventos para comunicación asíncrona entre servicios. |
-| 📑 Confluent Schema Registry | Registro de esquemas Avro para validar mensajes Kafka.       |
-| 📡 Kafka UI / Kafdrop        | Interfaz para visualizar topics, mensajes y configuraciones. |
-| 📦 Zookeeper                 | Requisito de Kafka para coordinación (en versiones no KRaft). |
-
-> 🔁 Es posible que se incluyan otros servicios en el futuro (por ejemplo, servicios simulados para restaurante o pagos).
+| Servicio                     | Descripción                                                  | Puerto(s)                  |
+|------------------------------|--------------------------------------------------------------|----------------------------|
+| 🐘 PostgreSQL                | Base de datos relacional principal.                          | 5432                       |
+| 🔑 PgAdmin                   | Interfaz de administración para PostgreSQL.                  | 7777                       |
+| 📦 Zookeeper                 | Coordinador de clúster para Kafka.                           | 2181                       |
+| 🟠 Apache Kafka              | Sistema de mensajería distribuido.                           | 9092, 9093, 9094           |
+| 📑 Schema Registry           | Registro de esquemas Avro para Kafka.                        | 8081                       |
+| 📊 Kafka UI (Kafdrop u otro) | Herramienta de visualización para topics Kafka.             | 9000                       |
+| 📈 Elasticsearch             | Almacenamiento de logs estructurados.                        | 9200                       |
+| 🧪 Logstash                  | Procesamiento de logs (parsing, filtrado, etc.).             | 5044 (default pipeline)    |
+| 📺 Kibana                    | Dashboard de visualización de logs.                          | 5601                       |
 
 ---
 
 ## 📂 Estructura del módulo
 
-```bash
+```text
 docker-compose/
-├── database.yaml                # Archivo con la base de datos y dashboard
-├── .env                        # Variables de entorno comunes
-├── common.yaml                 # Scripts auxiliares
-├── zookeeper.yaml              # Archivo con el coordinador de Kafka
-├── kafka-cluster.yaml          # Broker de eventos
-├── kafka-init.yaml             # Scripts auxiliares de kafka que se corren SOLO 1 vez
-├── volumes                     # Mapeo de todos los volúmenes de docker (no se suben a git)
-└── README.md                   # Este mismo documento
+├── .env                    # Variables reutilizadas (hostnames, puertos, rutas)
+├── common.yaml             # Redes, volúmenes y configuraciones compartidas
+├── database.yaml           # PostgreSQL y PgAdmin
+├── kafka-cluster.yaml      # Brokers Kafka (multi-nodo)
+├── kafka-init.yaml         # Inicialización de topics Kafka (solo una vez)
+├── zookeeper.yaml          # Servicio de Zookeeper
+├── elk.yaml                # Elasticsearch, Logstash y Kibana
+├── volumes/                # Directorios persistentes (vía bind mount o volúmenes)
+│   ├── kafka/
+│   ├── zookeeper/
+│   ├── logstash/
+│   └── database/
+└── readme.md               # Este documento
 ```
 
 ---
 
-## 🚀 Cómo utilizar
+## 🚀 Cómo levantar los servicios
 
-1. Asegúrate de tener Docker y Docker Compose instalados.
-2. Desde el directorio `docker-compose`, ejecuta:
+> Asegúrate de tener **Docker y Docker Compose** instalados.
 
-### Para kafka la 1ª vez (esperando a que entre comandos los contenedores se armen y estén estables)
-#### Cada comando en una ventana de terminal diferente
+### 🔄 Inicialización de Kafka (solo la primera vez)
 
-```bash
-docker-compose -f .\common.yaml -f .\zookeeper.yaml up
-docker-compose -f .\common.yaml -f .\kafka-cluster.yaml up
-docker-compose -f .\common.yaml -f .\kafka-init.yaml up
-```
-### Para kafka una vez arrancado la 1ª vez y de entonces en adelante (esperando a que entre comandos los contenedores se armen y estén estables)
-#### Cada comando en una ventana de terminal diferente
+Ejecutar **en terminales separadas** (o usar `-d` para modo detached):
 
 ```bash
-docker-compose -f .\common.yaml -f .\zookeeper.yaml up
-docker-compose -f .\common.yaml -f .\kafka-cluster.yaml up
+docker-compose -f common.yaml -f zookeeper.yaml up
+docker-compose -f common.yaml -f kafka-cluster.yaml up
+docker-compose -f common.yaml -f kafka-init.yaml up
 ```
-### Para la base de datos
+
+### 🔁 Kafka en ejecuciones posteriores
 
 ```bash
-docker-compose -f .\database.yaml up -d
+docker-compose -f common.yaml -f zookeeper.yaml up
+docker-compose -f common.yaml -f kafka-cluster.yaml up
 ```
 
-3. Accede a servicios como:
+### 🐘 Base de datos y panel
 
-- **Kafka manager**: http://localhost:9000
-- **Schema Registry**: http://localhost:8081
-- **PostgreSQL**: puerto 5432
-- **PgAdmin**: http://localhost:7777
+```bash
+docker-compose -f database.yaml up -d
+```
+
+### 📊 Stack ELK (Logs)
+
+```bash
+docker-compose -f elk.yaml up -d
+```
 
 ---
 
-## 🧠 ¿Por qué está separado este módulo?
+## 🌐 Acceso a herramientas
 
-- Aísla la infraestructura del código de negocio.
-- Facilita el **encendido/apagado** de los entornos necesarios sin contaminar el código fuente.
-- Permite que otros microservicios usen esta configuración sin importar su lenguaje o stack.
-- **Escalable**: puedes añadir nuevos servicios o redes Docker sin afectar otros módulos.
+| Herramienta         | URL                                 |
+|---------------------|--------------------------------------|
+| PgAdmin             | http://localhost:7777                |
+| Kafka UI / Kafdrop  | http://localhost:9000                |
+| Schema Registry     | http://localhost:8081                |
+| Kibana              | http://localhost:5601                |
+
+---
+
+## 🧠 Ventajas del diseño modular
+
+- ✅ **Separación por capas**: puedes levantar solo lo que necesites.
+- ✅ **Reutilización de volúmenes**: persistencia y aislamiento por servicio.
+- ✅ **Multi-ambiente**: posible extender para CI/CD, staging, etc.
+- ✅ **Independencia del lenguaje**: usable por microservicios en cualquier stack.
+
+---
+
+## 📌 Recomendaciones
+
+- Usa `.env` para cambiar puertos o rutas si algún servicio entra en conflicto.
+- Agrega más servicios creando nuevos YAML que extiendan `common.yaml`.
+- Revisa `volumes/` para limpiar datos si hay inconsistencias.
+
+---
+
+## ✅ Conclusión
+
+Esta carpeta permite levantar de forma rápida y confiable toda la infraestructura de soporte para pruebas, desarrollo local o simulación de escenarios productivos.  
+Ideal para integrarse con los microservicios del sistema durante el desarrollo.

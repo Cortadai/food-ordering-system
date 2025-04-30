@@ -1,8 +1,129 @@
-## Info
+## Food-Ordering-System
 
 Microservicios con Spring Boot. Arquitectura limpia y hexagonal, DDD, SAGA, Outbox, CQRS y Kafka.
 
 ![Texto alternativo](./infrastructure/assets/project-overview-section-1.png)
+
+---
+
+# 🍽️ Flujo completo de una orden en el sistema de pedidos
+
+Este documento explica el **flujo de trabajo completo** desde que se crea una orden hasta que es aprobada o rechazada, detallando la participación de cada microservicio, evento Kafka, módulo `saga` y `outbox`.
+
+---
+
+## 🧭 Resumen del flujo
+
+```
+Cliente → Order Service → Saga / Outbox → Kafka → Payment Service / Restaurant Service → Kafka → Order Service → Finalización
+```
+
+---
+
+## 🛒 Paso a paso
+
+### 1. **Creación de la orden (cliente)**
+
+- El cliente realiza una petición `POST /orders` al `OrderController`.
+- La petición se convierte en un `CreateOrderCommand` y es gestionada por `OrderApplicationService`.
+
+### 2. **Inicio del proceso de orden**
+
+- Se ejecuta la lógica de negocio en `OrderCreateHelper` y `OrderDomainService`.
+- Se crea la entidad `Order` con estado `PENDING`.
+- Se genera un evento `OrderCreatedEvent`.
+
+### 3. **Inicio de la Saga de Pago**
+
+- El `OrderPaymentSaga` intercepta el evento y llama a `PaymentRequestMessagePublisher`.
+- Se construye el payload y se guarda en la tabla `payment_outbox` (patrón **Outbox**).
+- El `PaymentOutboxScheduler` detecta nuevos mensajes y los publica en Kafka.
+
+---
+
+## 💳 Validación del pago (Payment Service)
+
+- `PaymentRequestKafkaListener` consume el evento desde Kafka.
+- El `PaymentDomainService` evalúa si el cliente tiene crédito.
+- Se genera uno de estos eventos:
+   - `PaymentCompletedEvent`
+   - `PaymentFailedEvent`
+
+- Estos eventos se colocan en `order_outbox` y luego se publican a Kafka.
+
+---
+
+## 📦 Procesamiento de la respuesta de pago
+
+- `PaymentResponseKafkaListener` en `OrderService` recibe el evento.
+- `PaymentResponseMessageListenerImpl` lo maneja:
+   - Si fue exitoso: avanza la saga.
+   - Si falló: cancela la orden.
+
+---
+
+## 🍽️ Aprobación del restaurante
+
+- Si el pago fue correcto, el `OrderApprovalSaga` inicia la segunda fase.
+- Se genera un `RestaurantApprovalRequest` y se guarda en `approval_outbox`.
+- El `ApprovalOutboxScheduler` publica el evento a Kafka.
+
+---
+
+## 🧑‍🍳 Respuesta del restaurante
+
+- `RestaurantApprovalRequestKafkaListener` en `RestaurantService` recibe el evento.
+- Evalúa si el restaurante acepta el pedido (stock, disponibilidad...).
+- Publica una respuesta (`approved` o `rejected`) a Kafka.
+
+---
+
+## ✅ Finalización
+
+- `RestaurantApprovalResponseKafkaListener` en `OrderService` consume el evento.
+- `RestaurantApprovalResponseMessageListenerImpl` actualiza el estado de la orden:
+   - `APPROVED` → Pedido confirmado.
+   - `REJECTED` → Pedido cancelado.
+
+- La saga se cierra. El flujo ha finalizado.
+
+---
+
+## 🧠 Participación de los módulos
+
+| Módulo          | Rol                                                                 |
+|------------------|----------------------------------------------------------------------|
+| `order-application` | Lógica principal de orquestación, inicio de Saga, publicación inicial |
+| `saga`           | Define los pasos y estados posibles de la transacción distribuida    |
+| `outbox`         | Garantiza consistencia entre base de datos y Kafka                   |
+| `kafka`          | Mecanismo de transporte asíncrono de eventos                         |
+| `payment-service`| Evalúa crédito del cliente                                           |
+| `restaurant-service` | Acepta o rechaza la orden                                         |
+
+---
+
+## 🔁 Diagrama de flujo simplificado
+
+```
+[ Order Service ]
+    ↓ create order
+[ Saga Init ] ──> [ Outbox → Kafka ] ──> [ Payment Service ]
+                                        ↓
+                               [ Kafka → Order Service ]
+                                        ↓
+                                [ Saga Step 2 ] ──> [ Restaurant Service ]
+                                                   ↓
+                                        [ Kafka → Order Service ]
+                                                   ↓
+                                          Orden Finalizada
+```
+
+---
+
+## ✅ Conclusión
+
+Este flujo demuestra cómo aplicar de forma efectiva los patrones **Saga**, **Outbox** y **mensajería con Kafka** en una arquitectura de microservicios.  
+El diseño garantiza **consistencia eventual**, **desacoplamiento**, **resiliencia** y **trazabilidad completa** del proceso de una orden.
 
 ---
 

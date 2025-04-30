@@ -1,93 +1,33 @@
-# 📦 `common-domain` - Módulo de clases reutilizables del dominio
+# 🧠 Módulo: `common-domain`
 
-## 🧭 Propósito
-
-El módulo `common-domain` forma parte del paquete `common` del sistema y contiene **abstracciones y clases reutilizables** del dominio, diseñadas para ser compartidas entre distintos microservicios. Proporciona bloques base para trabajar con entidades, identificadores, objetos de valor, excepciones y eventos de dominio, facilitando una implementación consistente y limpia de DDD (Domain-Driven Design).
+> Este módulo contiene **entidades base**, **objetos de valor reutilizables** y **eventos de dominio genéricos** para todos los microservicios.
 
 ---
 
-## 📁 Estructura
+## 📦 Contenido principal
 
-```plaintext
-common-domain/
-├── pom.xml
-└── src/
-    └── main/
-        ├── java/
-        │   └── com/food/ordering/system/domain/
-        │       ├── entity/
-        │       │   ├── AggregateRoot.java
-        │       │   └── BaseEntity.java
-        │       ├── events/
-        │       │   ├── DomainEvent.java
-        │       │   └── publisher/DomainEventPublisher.java
-        │       ├── exception/
-        │       │   └── DomainException.java
-        │       └── valueobject/
-        │           ├── BaseId.java
-        │           ├── CustomerId.java
-        │           ├── Money.java
-        │           ├── OrderApprovalStatus.java
-        │           ├── OrderId.java
-        │           ├── OrderStatus.java
-        │           ├── PaymentStatus.java
-        │           ├── ProductId.java
-        │           └── RestaurantId.java
-```
+- `BaseEntity`, `AggregateRoot`: superclases para entidades de dominio.
+- `DomainEvent<T>`: interfaz genérica para representar eventos del dominio.
+- `DomainEventPublisher<T>`: interfaz para publicar eventos.
+- `DomainException`: excepción base común.
 
 ---
 
-## 🔍 Componentes principales
+## 🧩 Objetos de valor (Value Objects)
 
-### 🧩 Entidades Base
+Estos objetos son compartidos entre microservicios:
 
-- `BaseEntity<T>`  
-  Clase abstracta genérica para cualquier entidad con `id`, y que define `equals` y `hashCode` basados en esa identidad.
-
-- `AggregateRoot<T>`  
-  Extiende `BaseEntity`. Sirve como **marcador semántico** para distinguir entidades raíz de agregados (Aggregate Roots).
-
----
-
-### 🆔 Identificadores tipados (`valueobject`)
-
-Todas las clases que extienden `BaseId<T>`, como `OrderId`, `ProductId`, etc., encapsulan `UUID` o `Long` para evitar errores al intercambiar IDs.
-
-```java
-public class OrderId extends BaseId<UUID> { ... }
-```
+- `Money`: cantidad monetaria con validaciones
+- `BaseId<T>`: ID genérico
+- `OrderId`, `CustomerId`, `RestaurantId`, `ProductId`, etc.
+- Enums:
+  - `OrderStatus`, `OrderApprovalStatus`
+  - `PaymentStatus`, `PaymentOrderStatus`
+  - `RestaurantOrderStatus`
 
 ---
 
-### 💵 Objeto de valor `Money`
-
-Clase inmutable que representa dinero con lógica de suma, resta, multiplicación, comparación, y manejo de escala/precisión usando `BigDecimal`.
-
----
-
-### 📜 Enumeraciones
-
-- `OrderStatus`: `PENDING`, `PAID`, `APPROVED`, `CANCELLING`, `CANCELLED`
-- `PaymentStatus`: `COMPLETED`, `CANCELLED`, `FAILED`
-- `OrderApprovalStatus`: `APPROVED`, `REJECTED`
-
----
-
-### ⚠️ Excepciones
-
-- `DomainException`: clase base para lanzar errores del dominio.
-  Se extiende en módulos específicos para construir excepciones contextualizadas (`OrderDomainException`, etc.).
-
----
-
-### 📬 Eventos de Dominio
-
-- `DomainEvent<T>`: interfaz marcador.
-- `DomainEventPublisher<T>`: interfaz genérica para publicar eventos de dominio, implementada en capas externas.
-
----
-
-### 📚 Archivos de Documentación
+## 📚 Archivos de Documentación
 
 Este módulo contiene dos archivos Markdown útiles:
 
@@ -96,6 +36,8 @@ Este módulo contiene dos archivos Markdown útiles:
 
 ---
 
-#### ✅ Conclusión
+## 🎯 Propósito
 
-Este módulo es esencial para lograr consistencia y claridad en todos los microservicios. Al encapsular conceptos de DDD reutilizables y sin dependencias de frameworks, **promueve un dominio rico, expresivo y limpio**.
+- Reutilización de tipos comunes en todos los dominios
+- Estandarización de entidades y eventos
+- Fundamento del modelo de dominio en cada microservicio

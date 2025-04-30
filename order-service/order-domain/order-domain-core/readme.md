@@ -32,8 +32,8 @@ Contiene **entidades del dominio** y **raíz de agregado**:
 
 ### 🌟 `Order`
 - Es la **Aggregate Root**.
+- Coordina las reglas de negocio del agregado de pedido.
 - Contiene una colección de `OrderItem`s.
-- Coordina las reglas de negocio.
 - Expone métodos como `validateOrder`, `initializeOrder`, `pay`, `approve`, `initCancel`, `cancel`.
 
 ### 🧩 `OrderItem`
@@ -45,7 +45,7 @@ Contiene **entidades del dominio** y **raíz de agregado**:
 - Se usa en `OrderItem` para validar precios reales desde `Restaurant`.
 
 ### 👤 `Customer` / `Restaurant`
-- Entidades simples con `id`, `products` y `active` (en `Restaurant`).
+- Entidades con `id`, `products` y `active` (en `Restaurant`).
 - Se usan para validar la existencia antes de crear una orden.
 
 ---
@@ -59,7 +59,7 @@ Contiene objetos de valor reutilizables, que:
 Incluye:
 
 - `Money`: lógica monetaria (add, subtract, multiply, isGreaterThan...)
-- `OrderId`, `CustomerId`, `ProductId`, `RestaurantId`, `TrackingId`, etc.
+- `OrderItemId`, `TrackingId`, etc.
 - `StreetAddress`: para direcciones postales (usado en `Order`)
 - `OrderStatus`, `OrderApprovalStatus`, `PaymentStatus`: enums para estado
 
@@ -118,6 +118,31 @@ Contiene **la interfaz y su implementación del servicio de dominio**:
 
 ---
 
+## 🧠 Patrón aplicado
+
+Este módulo sigue principios de **Domain-Driven Design (DDD)** y forma parte de la **arquitectura hexagonal** del sistema.
+
+Incluye:
+
+- Entidades y Agregados con lógica de negocio
+- Objetos de valor inmutables
+- Servicios de dominio con orquestación entre entidades
+- Eventos de dominio para comunicación interna
+- Excepciones específicas del dominio
+
+---
+
+## 🧪 Testing y dependencias
+
+Este módulo:
+
+- Es completamente **independiente de infraestructura externa** (no depende de Spring, Hibernate, etc.)
+- Es altamente **testeable de forma aislada** mediante pruebas unitarias puras
+
+---
+
 ## ✅ Conclusión
 
-Este módulo contiene **el corazón de la lógica de negocio** del servicio de pedidos. Todo pasa por aquí antes de que algo sea persistido, publicado o validado. Está completamente libre de dependencias externas a Spring (excepto el log dentro de la implementación del dominio).
+`order-domain-core` representa el **núcleo de negocio** del servicio de pedidos. Define las reglas, entidades, eventos y objetos fundamentales del dominio.
+
+Es la capa más estable y protegida, sobre la cual giran todas las demás decisiones del sistema.

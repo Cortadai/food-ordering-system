@@ -1,73 +1,70 @@
-# 📦 `kafka-consumer`
+# 📥 kafka-consumer
 
-Este submódulo se encarga de **consumir mensajes desde Kafka** y redirigirlos a los componentes del dominio que reaccionan a eventos externos. Es un **adaptador de entrada (input adapter)** en la arquitectura hexagonal.
-
----
-
-## 🧭 Rol en la arquitectura
-
-- Pertenece a la **capa de infraestructura**.
-- **Recibe eventos** desde Kafka y los convierte en objetos del dominio o en DTOs que serán entregados a servicios de aplicación o controladores de eventos (`MessageListener`).
-- Actúa como **puente entre Kafka y los puertos de entrada** del dominio.
+> Este submódulo actúa como **adaptador de entrada** que permite recibir eventos desde Kafka.  
+Está diseñado como un componente genérico reutilizable que transforma mensajes Kafka en eventos del dominio, sin acoplarse a la lógica de negocio.
 
 ---
 
-## 🧱 Estructura del módulo
+## 📦 Estructura de paquetes
 
-### 📁 `com.food.ordering.system.kafka.consumer`
-
-Contiene implementaciones concretas para los consumidores de eventos.
-
-#### ✅ `KafkaConsumer<K, V>`
-Clase genérica que encapsula la lógica de consumo de eventos desde Kafka.
-
-```java
-@Component
-public class KafkaConsumer<K, V> {
-    // Internamente podría usar Spring Kafka Listener (no mostrado aquí)
-    public void consume(String topicName, Consumer<K, V> handler) {
-        // Lógica de binding con listener
-    }
-}
-```
-
-> Es habitual que los consumidores específicos implementen interfaces como `@KafkaListener`.
-
----
-
-## 🧭 Flujo de trabajo típico
-
-1. **Kafka produce** un evento (`PaymentCompletedEvent`, por ejemplo).
-2. `KafkaConsumer` recibe ese evento.
-3. Lo convierte (si es necesario) usando un `DataMapper` desde Avro a DTO.
-4. Llama a un **puerto de entrada del dominio**, como `PaymentResponseMessageListener`.
-5. El dominio maneja el evento y ejecuta las reglas necesarias (p. ej., marcar un pedido como pagado).
-
----
-
-### Ejemplo práctico (en otro módulo)
-
-```java
-@KafkaListener(topics = "${kafka.payment.response.topic}")
-public void receive(@Payload PaymentResponseAvroModel message) {
-    PaymentResponse paymentResponse = mapper.toPaymentResponse(message);
-    listener.paymentCompleted(paymentResponse);
-}
+```text
+kafka-consumer
+└── com.food.ordering.system.kafka.consumer
+    ├── KafkaConsumer.java
+    └── config
+        └── KafkaConsumerConfig.java
 ```
 
 ---
 
-## 🔧 ¿Cómo se configura?
+## 🧱 Componentes principales
 
-- Utiliza `kafka-config-data` para recuperar información de topics, grupo de consumidores, etc.
-- Anotaciones típicas: `@KafkaListener`, `@EnableKafka`, configuración de `ConsumerFactory`, `ConcurrentKafkaListenerContainerFactory`.
+### 🔁 `KafkaConsumer<K, V>`
+Clase genérica que centraliza la lógica de recepción de mensajes:
+- Utiliza `@KafkaListener` para escuchar topics configurados
+- Encapsula el procesamiento de mensajes mediante un `Consumer<K, V>` funcional
+- Facilita trazabilidad, logging y manejo de errores
 
 ---
 
-## 🎯 Ventajas
+### ⚙️ `KafkaConsumerConfig`
+Clase de configuración que:
+- Registra los beans necesarios para consumir desde Kafka (`ConsumerFactory`, `ConcurrentKafkaListenerContainerFactory`)
+- Utiliza las propiedades inyectadas desde `KafkaConfigData`
+- Define estrategias de deserialización y políticas de retry
+
+---
+
+## 🔁 Flujo típico: Consumo de evento
+
+1. Kafka publica un mensaje en un topic (p. ej. `payment-response-topic`)
+2. `KafkaConsumer` lo recibe mediante `@KafkaListener`
+3. El mensaje Avro es deserializado y transformado a DTO o evento del dominio
+4. Se invoca un handler o listener de aplicación (ej. `PaymentResponseMessageListener`)
+5. El servicio de dominio procesa el evento
+
+---
+
+## 🧠 Ventajas del diseño
 
 | Ventaja | Descripción |
 |--------|-------------|
-| ✅ Desacoplamiento | El dominio no sabe que los eventos vienen de Kafka. |
-| ♻️ Centralización | Se puede reutilizar lógica de deserialización, logging, error handling. |
-| 🔄 Integración reactiva | Ideal para patrones como Event Sourcing, Saga o Coreografía basada en eventos. |
+| 🔌 Extensible | Cualquier evento puede ser consumido registrando un nuevo `@KafkaListener`. |
+| 🧩 Reutilizable | La clase genérica `KafkaConsumer` puede adaptarse a múltiples tipos de mensaje. |
+| 💡 Observabilidad | Fácil de instrumentar con logs, trazas y métricas. |
+| 🧪 Testeable | Puede probarse de forma aislada usando datos simulados. |
+
+---
+
+## 📚 Dependencias requeridas
+
+- Spring Kafka
+- kafka-config-data (para centralizar configuración)
+- Avro (para los modelos de datos serializados)
+
+---
+
+## ✅ Conclusión
+
+`kafka-consumer` representa una capa de entrada desacoplada, preparada para recibir y transformar eventos Kafka sin introducir dependencias con la lógica de negocio.  
+Este diseño respeta los principios de la arquitectura hexagonal, permitiendo evolucionar el sistema sin romper integraciones existentes.

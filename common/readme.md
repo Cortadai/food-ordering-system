@@ -1,53 +1,42 @@
-# 📦 `common` - Módulo base compartido
+# 🔧 Módulo principal: `common`
 
-El módulo `common` sirve como **raíz de reutilización** para componentes esenciales que deben ser compartidos entre múltiples microservicios dentro del sistema de pedidos.
-
-Este módulo se divide en dos submódulos independientes:
-
-- [`common-domain`](./common-domain/readme.md)
-- [`common-application`](./common-application/readme.md)
+> Este módulo agrupa componentes **reutilizables** y **compartidos** entre todos los microservicios del sistema. Está dividido en tres submódulos: `common-domain`, `common-application` y `common-data-access`.
 
 ---
 
-## 📂 `common-domain` – Objetos base del modelo de dominio
+## 📦 Submódulos incluidos
 
-Este submódulo define **elementos fundamentales del núcleo de negocio** que pueden ser usados por distintos dominios como `order`, `payment`, `restaurant`, etc.
-
-### ✨ Componentes clave
-
-| Clase / Interfaz                | Descripción                                                                 |
-|-------------------------------|-----------------------------------------------------------------------------|
-| `BaseEntity<T>`               | Clase abstracta para entidades con ID y lógica de igualdad/hash.            |
-| `AggregateRoot<T>`           | Marca semántica para raíces de agregados.                                   |
-| `BaseId<T>`                  | Objeto de valor para IDs tipados (`OrderId`, `CustomerId`, etc.).           |
-| `Money`                      | Objeto de valor inmutable que encapsula lógica monetaria.                   |
-| `OrderStatus`, `PaymentStatus`, `OrderApprovalStatus` | Enums que describen estados válidos.                           |
-| `StreetAddress`              | Objeto de valor para direcciones postales.                                  |
-| `DomainEvent<T>`             | Interfaz marcador para eventos del dominio.                                 |
-| `DomainException`            | Excepción base para errores dentro del dominio.                             |
-
-✅ Este módulo garantiza **consistencia conceptual y reutilización** entre bounded contexts.
+| Submódulo              | Descripción                                                                 |
+|------------------------|-----------------------------------------------------------------------------|
+| `common-domain`        | Entidades base, objetos de valor, eventos de dominio compartidos           |
+| `common-application`   | Utilidades comunes de la capa de aplicación, como manejo global de errores |
+| `common-data-access`   | Persistencia compartida, como la entidad `Restaurant`                      |
 
 ---
 
-## 📂 `common-application` – Manejador global de excepciones
+## 🧩 ¿Por qué existe este módulo?
 
-Este submódulo contiene el **mecanismo centralizado de gestión de errores**, útil para cualquier servicio que implemente controladores HTTP.
+El objetivo de `common` es **evitar duplicación** y facilitar una base sólida para todos los microservicios, que puedan compartir:
 
-### ✨ Componentes clave
-
-| Clase                         | Descripción                                                                 |
-|------------------------------|------------------------------------------------------------------------------|
-| `GlobalExceptionHandler`     | Controlador global con `@RestControllerAdvice` para capturar excepciones.   |
-| `ErrorDto`                   | Objeto de respuesta estructurado para representar errores.                  |
-
-Se encarga de traducir excepciones del dominio o técnicas en respuestas JSON claras y estandarizadas para el consumidor de la API.
+- Tipos genéricos (`Money`, `BaseId`, `OrderStatus`, etc.)
+- Entidades JPA comunes
+- Utilidades de infraestructura y errores
 
 ---
 
-## 🧠 Beneficios del módulo `common`
+## 🔁 Dependencias
 
-- 🔁 **Reutilización de lógica** entre microservicios sin duplicación.
-- 🔒 **Seguridad en tipos** gracias a `BaseId` y objetos de valor.
-- 🧱 **Separación clara de capas**: el `domain` no depende de frameworks, el `application` sí.
-- ⚠️ **Manejo coherente de errores** para toda la arquitectura.
+Cada microservicio importa uno o más de estos submódulos según lo que necesita:
+
+- `order-service`, `restaurant-service`, `payment-service` utilizan `common-domain` y `common-application`
+- `order-service` y `restaurant-service` utilizan `common-data-access` para gestionar `Restaurant`
+
+---
+
+## ✅ Beneficios
+
+- Reutilización consistente entre servicios
+- Separación de responsabilidades
+- Mejores prácticas de diseño modular
+
+Este módulo es clave para mantener una arquitectura limpia y coherente en un ecosistema de microservicios.

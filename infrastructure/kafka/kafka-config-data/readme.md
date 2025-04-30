@@ -1,70 +1,93 @@
-# 📦 `kafka-config-data`
+# ⚙️ kafka-config-data
 
-Este submódulo forma parte de la infraestructura del sistema y contiene la **configuración compartida** necesaria para trabajar con Apache Kafka en los microservicios.
-
----
-
-## 🧭 Rol en la arquitectura
-
-- Pertenece a la **capa de infraestructura** de la arquitectura hexagonal.
-- Es un **módulo de configuración común** utilizado por los componentes que interactúan con Kafka (consumidores y productores).
-- No contiene lógica de negocio ni lógica de mensajería. Su función es proporcionar configuración desacoplada y centralizada.
+> Este submódulo contiene las **clases de configuración centralizadas** para Kafka.  
+Proporciona una forma tipada y reutilizable de acceder a propiedades definidas en `application.yml` o en un servidor de configuración externo.
 
 ---
 
-## 🧱 Estructura del módulo
+## 📦 Estructura de paquetes
 
-### 📁 `com.food.ordering.system.kafka.config`
+```text
+kafka-config-data
+└── com.food.ordering.system.kafka.config.data
+    ├── KafkaConfigData.java
+    ├── KafkaConsumerConfigData.java
+    └── KafkaProducerConfigData.java
+```
 
-Contiene clases de configuración anotadas con `@Configuration` de Spring.
+---
 
-#### ✅ `KafkaConfigData`
-Clase `@ConfigurationProperties` que mapea la configuración Kafka definida en `application.yml`.
+## 📁 Clases principales
 
-Ejemplo de propiedades mapeadas:
+### 🔧 `KafkaConfigData`
+Contiene propiedades generales comunes a Kafka:
+- `bootstrapServers`
+- `schemaRegistryUrl`
+- `topicName` (o prefijos base)
+
+Mapea propiedades bajo el prefijo:
 
 ```yaml
 kafka-config:
   bootstrap-servers: localhost:9092
-  schema-registry-url-key: schema.registry.url
   schema-registry-url: http://localhost:8081
-  topic-name: food-ordering-topic
 ```
-
-En código:
-
-```java
-@Configuration
-@ConfigurationProperties(prefix = "kafka-config")
-public class KafkaConfigData {
-    private String bootstrapServers;
-    private String schemaRegistryUrlKey;
-    private String schemaRegistryUrl;
-    private String topicName;
-    // Getters y setters
-}
-```
-
-Esto permite que otros módulos simplemente inyecten esta clase para acceder a la configuración centralizada de Kafka.
 
 ---
 
-## 🎯 ¿Quién lo utiliza?
+### 🛠️ `KafkaProducerConfigData`
+Propiedades específicas para el productor Kafka:
+- `acks`
+- `batchSize`
+- `lingerMs`
+- `keySerializerClass`
+- `valueSerializerClass`
 
-Este módulo es usado como dependencia por:
-
-- `kafka-producer`
-- `kafka-consumer`
-- Cualquier microservicio que quiera publicar o consumir eventos Kafka
-- Servicios que interactúan con el esquema Avro a través de un **Schema Registry**
+Prefijo:
+```yaml
+kafka-producer-config:
+  acks: all
+  batch-size: 16384
+```
 
 ---
 
-## ✅ Ventajas de este enfoque
+### 📥 `KafkaConsumerConfigData`
+Propiedades específicas del consumidor Kafka:
+- `groupId`
+- `autoOffsetReset`
+- `keyDeserializerClass`
+- `valueDeserializerClass`
+
+Prefijo:
+```yaml
+kafka-consumer-config:
+  group-id: payment-group
+  auto-offset-reset: earliest
+```
+
+---
+
+## 🧩 Rol en la arquitectura
+
+- Sirve como módulo **compartido** entre `kafka-producer` y `kafka-consumer`
+- Proporciona objetos `@ConfigurationProperties` listos para inyección
+- Permite que los módulos de mensajería estén **desacoplados del origen de configuración**
+
+---
+
+## 🎯 Ventajas del diseño
 
 | Ventaja | Descripción |
 |--------|-------------|
-| 🔁 Reutilización | La configuración de Kafka se define una vez y se reutiliza en múltiples lugares. |
-| 🛠️ Mantenimiento | Si cambias el servidor de Kafka o los topics, lo haces en un único sitio. |
-| 🚫 Aislamiento | Este módulo no conoce nada de los productores o consumidores, solo configura. |
-| ☁️ Compatible con Spring Cloud Config | Puede evolucionar fácilmente a configuración externa centralizada.|
+| 🔁 Reutilización | Las propiedades se definen una vez y se usan en múltiples módulos |
+| ✅ Tipado fuerte | Se detectan errores en tiempo de compilación |
+| ☁️ Configurable externamente | Compatible con Spring Cloud Config |
+| 🔐 Centralización | Todas las propiedades Kafka están agrupadas de forma coherente |
+
+---
+
+## ✅ Conclusión
+
+`kafka-config-data` permite mantener la configuración de Kafka limpia, centralizada y desacoplada del código de publicación y consumo.  
+Es un módulo clave para escalar microservicios que dependan de mensajería Kafka sin replicar configuración en cada servicio.

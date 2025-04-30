@@ -1,12 +1,8 @@
 # 📦 Módulo: `order-dataaccess`
 
-> Responsable de acceder a la base de datos relacional del microservicio de pedidos.
+> Responsable del acceso a la base de datos del microservicio de pedidos (`order-service`).
 
-Contiene la capa de **acceso a datos** (Data Access Layer) del microservicio de pedidos. Se encarga de:
-
-- Mapear entidades de dominio a entidades JPA.
-- Interactuar con la base de datos usando repositorios Spring Data JPA.
-- Encapsular detalles de persistencia mediante adaptadores que implementan los puertos definidos en `order-application-service`.
+Este módulo implementa la **capa de persistencia** siguiendo el patrón de **puertos y adaptadores** (Hexagonal Architecture). Su propósito es convertir las entidades del dominio a representaciones JPA, delegar en repositorios Spring Data JPA, y ofrecer adaptadores que conecten con los puertos definidos en `order-application-service`.
 
 ---
 
@@ -24,68 +20,104 @@ order-dataaccess
 │   ├── entity
 │   ├── mapper
 │   └── repository
-└── restaurant
-    ├── adapter
-    ├── entity
-    ├── exception
-    ├── mapper
-    └── repository
+├── restaurant
+│   ├── adapter
+│   ├── mapper
+│   └── repository
+└── outbox
+    ├── payment
+    │   ├── adapter
+    │   ├── entity
+    │   ├── exception
+    │   ├── mapper
+    │   └── repository
+    └── restaurantapproval
+        ├── adapter
+        ├── entity
+        ├── exception
+        ├── mapper
+        └── repository
 ```
 
 ---
 
 ## 🧱 Entidades JPA
 
-Estas clases representan las tablas de la base de datos:
+Estas clases representan las tablas de la base de datos. Se utilizan en conjunto con Spring Data JPA:
 
 - `CustomerEntity`
 - `OrderEntity`, `OrderItemEntity`, `OrderAddressEntity`
-- `RestaurantEntity`, `RestaurantEntityId`
+- `ApprovalOutboxEntity`, `PaymentOutboxEntity`
 
 ---
 
 ## 🔁 Repositorios JPA
 
-Interfaces para acceder a la base de datos usando Spring Data JPA:
+Interfaces que extienden `JpaRepository`:
 
 - `CustomerJpaRepository`
 - `OrderJpaRepository`
-- `RestaurantJpaRepository`
+- `ApprovalOutboxJpaRepository`
+- `PaymentOutboxJpaRepository`
+
+Estas interfaces proporcionan las operaciones básicas CRUD para las entidades persistidas.
 
 ---
 
-## 🔁 Adaptadores
+## 🧩 Adaptadores
 
-Implementaciones de los puertos de salida definidos en el dominio:
+Implementaciones concretas de los **puertos de salida** definidos en el dominio:
 
 - `CustomerRepositoryImpl`
 - `OrderRepositoryImpl`
 - `RestaurantRepositoryImpl`
+- `PaymentOutboxRepositoryImpl`
+- `ApprovalOutboxRepositoryImpl`
 
-Estos adaptadores son usados por los servicios de aplicación para interactuar con la base de datos.
+Estos adaptadores encapsulan la lógica de acceso a datos y transforman los modelos a entidades del dominio.
 
 ---
 
 ## 🔄 Mapeadores
 
-Transforman entre entidades del dominio y entidades JPA:
+Clases encargadas de convertir entre las entidades del dominio y las entidades JPA persistidas:
 
 - `CustomerDataAccessMapper`
 - `OrderDataAccessMapper`
 - `RestaurantDataAccessMapper`
+- `PaymentOutboxDataAccessMapper`
+- `ApprovalOutboxDataAccessMapper`
 
 ---
 
 ## 🚨 Excepciones
 
-- `RestaurantDataAccessException`: encapsula errores de acceso a datos relacionados con restaurantes.
+El módulo define sus propias excepciones específicas de la capa de persistencia:
+
+- `PaymentOutboxNotFoundException`
+- `ApprovalOutboxNotFoundException`
+
+Permiten propagar errores semánticos sin depender de excepciones de infraestructura.
+
+---
+
+## 📦 Outbox Pattern
+
+Este módulo implementa el **Transactional Outbox Pattern**, que permite almacenar eventos de dominio en una tabla intermedia (`outbox`) para su posterior publicación por un scheduler.
+
+Se usan dos outbox diferenciadas:
+
+- `payment-outbox`: para eventos relacionados con pagos
+- `restaurant-approval-outbox`: para eventos relacionados con la aprobación del restaurante
 
 ---
 
 ## 🎯 Propósito
 
-El módulo `order-dataaccess` implementa una capa de persistencia desacoplada del núcleo del dominio. Gracias a la separación por paquetes y responsabilidades:
+- Cumplir con los principios de la **arquitectura hexagonal**, manteniendo la lógica de acceso a datos desacoplada del dominio.
+- Facilitar el testeo de la lógica del dominio sin depender de la base de datos.
+- Proveer mecanismos seguros y resilientes para la persistencia y publicación de eventos asíncronos mediante outbox.
 
-- Se respeta el patrón de puertos y adaptadores (arquitectura hexagonal).
-- Se facilita el testeo del dominio sin necesidad de base de datos.
-- Se permite intercambiar la tecnología de persistencia si fuera necesario.
+---
+
+Este módulo **no contiene lógica de negocio**, solo responsabilidades relacionadas con la persistencia y adaptación de datos. Es fundamental para garantizar la consistencia de datos y eventos en el microservicio `order-service`.

@@ -235,18 +235,31 @@
                                 <echo>Cleaning Kafka brokers and Zookeeper folders...</echo>
                                 <delete includeemptydirs="true" failonerror="false">
                                     <fileset dir="infrastructure/docker-compose/volumes/kafka/broker-1">
+                                        <include name="**/*"/>
                                         <exclude name=".gitkeep"/>
                                     </fileset>
+                                </delete>
+                                <delete includeemptydirs="true" failonerror="false">
                                     <fileset dir="infrastructure/docker-compose/volumes/kafka/broker-2">
+                                        <include name="**/*"/>
                                         <exclude name=".gitkeep"/>
                                     </fileset>
+                                </delete>
+                                <delete includeemptydirs="true" failonerror="false">
                                     <fileset dir="infrastructure/docker-compose/volumes/kafka/broker-3">
+                                        <include name="**/*"/>
                                         <exclude name=".gitkeep"/>
                                     </fileset>
+                                </delete>
+                                <delete includeemptydirs="true" failonerror="false">
                                     <fileset dir="infrastructure/docker-compose/volumes/zookeeper/data">
+                                        <include name="**/*"/>
                                         <exclude name=".gitkeep"/>
                                     </fileset>
+                                </delete>
+                                <delete includeemptydirs="true" failonerror="false">
                                     <fileset dir="infrastructure/docker-compose/volumes/zookeeper/transactions">
+                                        <include name="**/*"/>
                                         <exclude name=".gitkeep"/>
                                     </fileset>
                                 </delete>

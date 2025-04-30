@@ -1,76 +1,98 @@
-# 📦 `kafka-producer`
+# 🚀 kafka-producer
 
-Este submódulo implementa la **publicación de eventos** a Kafka. Forma parte de la **infraestructura de salida** de la arquitectura hexagonal, y es un **adaptador de salida (output adapter)** que implementa los **puertos de publicación de eventos** definidos en los módulos de dominio.
-
----
-
-## 🧭 Rol en la arquitectura
-
-- Pertenece a la **capa de infraestructura**.
-- **Implementa los ports de salida** definidos en el dominio (`DomainEventPublisher<T>`).
-- Utiliza el cliente de Kafka de Spring para publicar mensajes con configuración desacoplada.
+> Este submódulo implementa el **adaptador de salida** responsable de publicar eventos en Kafka.  
+Se conecta con el `KafkaTemplate` de Spring y aplica buenas prácticas de desacoplamiento y reutilización para facilitar la emisión de mensajes desde los microservicios.
 
 ---
 
-## 🧱 Estructura del módulo
+## 📦 Estructura de paquetes
 
-### 📁 `com.food.ordering.system.kafka.producer.service`
-
-Contiene la implementación concreta del publicador de eventos Kafka.
-
-#### ✅ `KafkaProducer<K, V>`
-Clase genérica que encapsula la lógica de publicación de eventos en Kafka.
-
-```java
-@Component
-public class KafkaProducer<K, V> {
-    private final KafkaTemplate<K, V> kafkaTemplate;
-
-    public void send(String topicName, K key, V message) {
-        kafkaTemplate.send(topicName, key, message);
-        // Puede incluir lógica de logging o trazabilidad
-    }
-}
-```
-
-> ✅ Esta clase se comporta como una **utilidad reutilizable** por cualquier publisher específico.
-
----
-
-### 📁 Ejemplo de implementación de publisher
-
-En módulos como `order-messaging`, se implementa:
-
-```java
-@Component
-public class OrderCreatedKafkaMessagePublisher
-        implements OrderCreatedPaymentRequestMessagePublisher {
-
-    private final KafkaProducer<String, AvroModel> kafkaProducer;
-
-    @Override
-    public void publish(OrderCreatedEvent event) {
-        String key = event.getOrder().getId().toString();
-        AvroModel message = mapper.mapToAvro(event);
-        kafkaProducer.send("order-topic", key, message);
-    }
-}
+```text
+kafka-producer
+└── com.food.ordering.system.kafka.producer
+    ├── service
+    │   └── impl
+    ├── exception
+    └── KafkaMessageHelper.java
+    └── KafkaProducerConfig.java
 ```
 
 ---
 
-## 🔧 ¿Cómo se configura?
+## 🧱 Componentes principales
 
-- Usa el módulo `kafka-config-data` para obtener los datos de conexión y configuración de topics.
-- Define beans como `KafkaTemplate` o `ProducerFactory` mediante la auto configuración de Spring Boot Kafka o archivos `@Configuration` si es necesario.
+### ⚙️ `KafkaProducerConfig`
+Define la configuración de Kafka para productores:
+- Bean de `KafkaTemplate<K, V>`
+- Propiedades del productor (serializers, retries, etc.)
+- Integración con `KafkaConfigData` para centralizar la configuración
 
 ---
 
-## 🎯 Ventajas de este enfoque
+### 📤 `KafkaProducer<K, V>`
+Interfaz genérica que define cómo se debe enviar un mensaje a Kafka:
+```java
+void send(String topic, K key, V message);
+```
+Se utiliza para abstraer la lógica de publicación, permitiendo mocks y testabilidad.
+
+---
+
+### 🧪 `KafkaProducerImpl<K, V>`
+Implementación concreta que:
+- Usa `KafkaTemplate.send(...)` para publicar
+- Aplica callbacks para éxito o error
+- Registra eventos para trazabilidad
+
+```java
+kafkaTemplate.send(topic, key, value)
+             .addCallback(successCallback, failureCallback);
+```
+
+---
+
+### 🧰 `KafkaMessageHelper`
+Clase utilitaria para:
+- Crear `ProducerRecord` con cabeceras
+- Enriquecer mensajes con metadatos si es necesario
+
+---
+
+### ❗ `KafkaProducerException`
+Excepción específica para errores en la publicación de eventos Kafka.
+
+---
+
+## 🔁 Flujo típico: Publicar evento
+
+1. Un servicio del dominio (por ejemplo, `OrderCreatedEventPublisher`) construye un mensaje.
+2. Se transforma en modelo Avro con un `DataMapper`.
+3. Se invoca `KafkaProducer.send(topic, key, message)`.
+4. El mensaje es enviado al topic mediante `KafkaTemplate`.
+5. El callback informa del éxito o error del envío.
+
+---
+
+## 🧠 Ventajas del diseño
 
 | Ventaja | Descripción |
 |--------|-------------|
-| ✅ Desacoplamiento | El dominio no conoce Kafka ni su implementación concreta. |
-| ♻️ Reutilización | `KafkaProducer<K, V>` es genérica y puede usarse para muchos tipos de eventos. |
-| 📦 Extensión simple | Solo necesitas implementar un publisher que use esta clase para publicar nuevos tipos de eventos. |
-| 🧪 Testeabilidad | Puedes sustituir `KafkaProducer` por un mock en tests sin tocar el dominio. |
+| 🔄 Reutilizable | `KafkaProducer<K,V>` puede usarse para múltiples eventos o servicios. |
+| ✅ Desacoplado | El dominio no depende de Kafka ni de Spring. Solo usa puertos. |
+| 🧪 Testeable | Fácil de simular en tests. Se puede mockear sin necesidad de Kafka real. |
+| 📊 Observabilidad | Usa callbacks y logs para rastrear éxito o fallo en la publicación. |
+
+---
+
+## 📚 Dependencias requeridas
+
+- Spring Kafka
+- kafka-config-data (para inyección de propiedades)
+- Avro (para los modelos serializados)
+
+---
+
+## ✅ Conclusión
+
+`kafka-producer` proporciona una solución limpia, genérica y reutilizable para la publicación de eventos en Kafka, alineada con la arquitectura hexagonal del sistema.  
+Permite mantener la lógica de negocio desacoplada del broker de eventos, asegurando que los cambios en Kafka no afecten a los microservicios de dominio.

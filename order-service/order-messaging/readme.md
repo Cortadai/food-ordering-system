@@ -1,6 +1,6 @@
 # 📦 Módulo: `order-messaging`
 
-> Implementa los adaptadores de salida responsables de publicar eventos de dominio hacia los tópicos de Kafka.
+> Este módulo implementa los adaptadores de **entrada (Kafka Listener)** y **salida (Kafka Publisher)** para el microservicio de pedidos (`order-service`), siguiendo el patrón de **puertos y adaptadores** (hexagonal architecture).
 
 ---
 
@@ -8,103 +8,94 @@
 
 ```plaintext
 order-messaging
-└── publisher
-    └── kafka
+├── listener
+│   └── kafka
+├── publisher
+│   └── kafka
 └── mapper
-└── publisher
-    └── kafka
 ```
 
 ---
 
-## 📨 `message.publisher.kafka`
+## 👂 Listener Kafka (`listener.kafka`)
 
-Contiene adaptadores **outbound** que implementan los puertos definidos en `order-application-service` y se encargan de publicar eventos a Kafka.
+Este paquete contiene los **consumidores de mensajes Kafka** que representan los adaptadores inbound del sistema. Conectan los eventos externos (desde otros microservicios) con el dominio.
 
-### ✅ Publicadores de eventos de dominio:
+### Clases principales:
 
-- `CreateOrderKafkaMessagePublisher`
-- `CancelOrderKafkaMessagePublisher`
-- `PayOrderKafkaPublisher`
+- `CustomerKafkaListener`: recibe eventos de creación de cliente
+- `PaymentResponseKafkaListener`: escucha eventos del servicio de pagos
+- `RestaurantApprovalResponseKafkaListener`: escucha eventos del servicio de restaurantes
 
-Cada clase implementa la interfaz `DomainEventPublisher<T>` y publica eventos como:
+Cada listener:
 
-- `OrderCreatedEvent`
-- `OrderCancelledEvent`
-- `OrderPaidEvent`
-
-Usan Kafka para emitir los eventos hacia los servicios de **pago** y **restaurante**.
-
----
-
-## 🔄 `message.mapper`
-
-Contiene mapeadores que traducen los eventos de dominio a mensajes específicos para Kafka:
-
-- `OrderMessagingDataMapper`
-
-Por ejemplo, convierte un `OrderCreatedEvent` en un `PaymentRequestAvroModel` antes de ser enviado.
+- Está anotado con `@KafkaListener`
+- Deserializa mensajes Avro (`CustomerAvroModel`, `PaymentResponseAvroModel`, etc.)
+- Usa `OrderMessagingDataMapper` para traducir a objetos del dominio
+- Llama a puertos de entrada definidos en la capa de aplicación como:
+  - `CustomerMessageListener`
+  - `PaymentResponseMessageListener`
+  - `RestaurantApprovalResponseMessageListener`
 
 ---
 
-Gracias por compartir las clases, están muy claras y bien estructuradas. Con esa base, aquí tienes la sección actualizada y ampliada para `listener.kafka` dentro del documento del módulo `order-messaging`:
+## 📤 Publisher Kafka (`publisher.kafka`)
+
+Este paquete contiene los **publicadores de eventos de dominio** hacia otros servicios vía Kafka.
+
+### Clases principales:
+
+- `OrderPaymentEventKafkaPublisher`: publica eventos de tipo `OrderCreatedEvent`, `OrderCancelledEvent` hacia el servicio de pagos
+- `OrderApprovalEventKafkaPublisher`: publica eventos de tipo `OrderPaidEvent` hacia el servicio de restaurantes
+
+Cada publicador:
+
+- Implementa interfaces como `PaymentRequestMessagePublisher` o `RestaurantApprovalRequestMessagePublisher`
+- Usa el `OrderMessagingDataMapper` para construir modelos Avro (`PaymentRequestAvroModel`, etc.)
+- Publica mensajes usando un `KafkaProducer` genérico
 
 ---
 
-## 👂 `listener.kafka`
+## 🔄 Mapeador (`mapper`)
 
-Este paquete contiene los **adaptadores inbound de eventos Kafka**, es decir, los **consumidores de mensajes** que vienen de otros servicios (como el de pagos o restaurantes).
+### `OrderMessagingDataMapper`
 
-### 🎧 Clases principales:
+Responsable de transformar:
 
-#### ✅ `PaymentResponseKafkaListener`
+- Eventos del dominio → modelos Avro (para publicar)
+- Modelos Avro → DTOs del dominio (al consumir)
 
-- Escucha mensajes del tópico `payment-response-topic-name`.
-- Usa un `@KafkaListener` para recibir mensajes tipo `PaymentResponseAvroModel`.
-- Según el estado del pago (`COMPLETED`, `CANCELLED`, `FAILED`), delega el procesamiento en:
-    - `paymentCompleted()` o
-    - `paymentCancelled()` del puerto de entrada `PaymentResponseMessageListener`.
-- Convierte los mensajes Avro a DTO del dominio con ayuda del `OrderMessagingDataMapper`.
-
-#### ✅ `RestaurantApprovalResponseKafkaListener`
-
-- Escucha mensajes del tópico `restaurant-approval-response-topic-name`.
-- Usa un `@KafkaListener` para recibir mensajes tipo `RestaurantApprovalResponseAvroModel`.
-- Según el estado de aprobación (`APPROVED`, `REJECTED`), llama a:
-    - `orderApproved()` o
-    - `orderRejected()` del puerto de entrada `RestaurantApprovalResponseMessageListener`.
-- También utiliza `OrderMessagingDataMapper` para adaptar los datos.
-
-### 📌 ¿Qué hacen estos listeners?
-
-- Actúan como **adaptadores secundarios de entrada**, parte del patrón hexagonal.
-- **Conectan el mundo externo (Kafka)** con los **servicios de dominio**, **sin que el dominio sepa de Kafka**.
-- Se encargan de:
-    - **Escuchar** los eventos que vienen de otros microservicios.
-    - **Traducirlos** con los mapeadores.
-    - **Llamar a los servicios del dominio** para continuar el flujo de negocio.
-
-### ⚙️ Detalles técnicos:
-
-- Los listeners implementan una interfaz genérica `KafkaConsumer<T>`.
-- Usan `@KafkaListener` de Spring para la integración automática con Kafka.
-- El sistema utiliza propiedades externas (`application.yml`) para configurar:
-    - Los IDs de los consumer groups.
-    - Los nombres de los tópicos.
+Este componente garantiza la separación entre modelos internos y externos.
 
 ---
 
-## 🛠️ Dependencias y herramientas
+## ⚙️ Tecnologías y configuración
 
-- Usa `KafkaProducerConfigData` para obtener configuración de tópicos y brokers.
-- Utiliza clases generadas por Avro para construir los mensajes Kafka.
+- Kafka está integrado con Spring Boot usando `@KafkaListener` y un `KafkaProducer`
+- Los nombres de los tópicos, grupos de consumidores y configuración de serialización se definen en:
+  - `KafkaConfigData`
+  - `KafkaConsumerConfigData`
+  - `KafkaProducerConfigData`
+- Los mensajes se definen usando **Avro schemas** (ver módulo `kafka-model`)
+- Los eventos del dominio se propagan de manera asíncrona a través de **Kafka topics**
+
+---
+
+## 🔁 Integración con la arquitectura hexagonal
+
+Este módulo **implementa puertos definidos en la capa de aplicación**:
+
+- `output.message.publisher` → publicadores Kafka
+- `input.message.listener` → listeners Kafka
+
+Así se asegura el **desacoplamiento** entre la lógica de negocio y los mecanismos de mensajería.
 
 ---
 
 ## 🎯 Propósito
 
-Este módulo asegura que:
+- Conectar el microservicio de pedidos con otros servicios mediante eventos asíncronos
+- Asegurar la comunicación fiable y desacoplada entre bounded contexts
+- Mantener la lógica de integración externa fuera del dominio de negocio
 
-- El servicio de pedidos no conoce los detalles técnicos de Kafka.
-- La publicación de eventos sigue el patrón de eventos de dominio (Domain Event Publisher).
-- La lógica de publicación es completamente desacoplada del núcleo del dominio.
+Este módulo permite que el dominio **permanezca puro**, delegando en adaptadores toda la complejidad de mensajería.

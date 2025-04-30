@@ -1,48 +1,48 @@
-# 🧭 Relación entre módulos Maven y arquitectura hexagonal / limpia
+# 🧭 Módulo principal: `order-service`
 
-> Este proyecto sigue una arquitectura limpia + hexagonal con separación clara de responsabilidades a través de módulos Maven.
+> Este módulo representa el microservicio completo de pedidos, compuesto por varios submódulos Maven alineados con los principios de **Arquitectura Hexagonal + Clean Architecture + SAGA Pattern**.
 
 ---
 
 ## 🧱 ¿Por qué dividir en varios módulos Maven?
 
-Cada módulo representa una **responsabilidad bien definida** dentro del microservicio. Esta división:
+Cada módulo representa una **responsabilidad específica** y desacoplada dentro del microservicio. Esta estructura:
 
-- Ayuda a **separar el dominio puro** de los detalles tecnológicos.
-- Permite **compilar, testear y mantener de forma aislada** cada componente.
-- Aplica el principio de **dependencias dirigidas hacia el dominio**, donde la lógica de negocio no depende de detalles externos.
+- Permite compilar, testear y evolucionar cada módulo por separado.
+- Favorece el principio de **dependencias dirigidas hacia el dominio**.
+- Facilita la reutilización y el cumplimiento de **DDD (Domain-Driven Design)**.
 
 ---
 
 ## 🧩 ¿Qué es la arquitectura hexagonal / limpia?
 
-Se basa en dividir la aplicación en **núcleo de dominio + adaptadores externos**, conectados mediante **puertos (ports)**. Es decir:
+Se basa en dividir el sistema en **núcleo de dominio + adaptadores externos**, conectados mediante **puertos (ports)**. Cada capa tiene reglas claras:
 
-| Concepto              | Explicación                                                                                      |
-|------------------------|--------------------------------------------------------------------------------------------------|
-| 🧠 **Dominio**         | Donde vive la lógica de negocio. No depende de nada externo.                                     |
-| 🔌 **Puerto (Port)**   | Una **interfaz** que define lo que necesita o expone el dominio (por ejemplo: guardar un pedido).|
-| 🔌 **Input Port**      | Interfaz usada por adaptadores de entrada para invocar casos de uso (comandos, queries).         |
-| 🔌 **Output Port**     | Interfaz usada por el dominio para interactuar con cosas externas (DB, Kafka, APIs…).            |
-| 🔁 **Adaptador (Adapter)** | Implementación de un puerto. Puede ser de entrada (REST Controller) o salida (repositorio JPA, Kafka…). |
-| 🎯 **Caso de uso**     | Lógica que orquesta el negocio, definida en los servicios de aplicación.                         |
-| 🧱 **Entidades / VO**  | Modelos del dominio (Order, CustomerId, Money…)                                                  |
-| 📤 **Publisher**       | Adaptador que publica eventos del dominio a sistemas externos (Kafka, etc.)                      |
+| Concepto                  | Explicación                                                                                      |
+|---------------------------|--------------------------------------------------------------------------------------------------|
+| 🧠 **Dominio**            | Lógica de negocio independiente de detalles técnicos.                                            |
+| 🔌 **Puerto (Port)**      | Interfaz que define una necesidad o capacidad del dominio.                                       |
+| 🔌 **Input Port**         | Cómo el dominio puede ser invocado (casos de uso, comandos).                                     |
+| 🔌 **Output Port**        | Cómo el dominio interactúa con infraestructura (repositorios, mensajería).                      |
+| 🔁 **Adaptador**          | Implementación concreta de un puerto (REST, Kafka, JPA...).                                      |
+| 🎯 **Caso de uso**        | Lógica orquestada que interactúa con el dominio y sus dependencias.                             |
+| 🧱 **Entidades / VO**     | Modelos del dominio con reglas internas.                                                         |
+| 📤 **Publisher**          | Adaptador que publica eventos del dominio hacia otros sistemas.                                 |
 
 ---
 
 ## 📦 Estructura general del proyecto
 
-| Módulo Maven                     | Descripción                                                                                                                   | Rol en arquitectura limpia      | Tipo de adaptador |
-|----------------------------------|-------------------------------------------------------------------------------------------------------------------------------|----------------------------------|-------------------|
-| `common-domain`                  | Entidades, objetos de valor, clases base (`BaseEntity`, `AggregateRoot`, `Money`, `BaseId`, etc.) que se **comparten** entre microservicios | Dominio compartido               | N/A               |
-| `common-application`            | Contratos y utilidades comunes a nivel de aplicación                                                                          | Utilidades de aplicación         | N/A               |
-| `order-domain-core`             | Núcleo del dominio del servicio de pedidos: entidades, objetos de valor, lógica de negocio, eventos                          | Núcleo del dominio               | N/A               |
-| `order-application-service`     | Servicios de dominio que coordinan las reglas de negocio, reciben comandos y devuelven eventos                               | Casos de uso (Application Service) | **Input Port**    |
-| `order-application`             | Entrada al sistema: servicios REST y validaciones. Recibe peticiones externas y traduce hacia el servicio de dominio         | Adaptador primario               | **Input Adapter** |
-| `order-dataaccess`              | Implementación de repositorios, mapeadores JPA, entidades de base de datos (JPA)                                              | Adaptador secundario             | **Output Adapter**|
-| `order-messaging`               | Publicación de eventos de dominio a Kafka y consumo de mensajes desde otros servicios                                         | Adaptador secundario             | **Output Adapter**|
-| `order-container`               | Módulo ejecutable con configuración Spring Boot, beans, propiedades, arranque de la app                                      | Orquestador final                | N/A               |
+| Módulo Maven              | Descripción                                                                                       | Rol en arquitectura limpia      | Tipo de adaptador |
+|---------------------------|---------------------------------------------------------------------------------------------------|----------------------------------|-------------------|
+| `common-domain`           | Entidades y objetos de valor reutilizables entre microservicios                                   | Dominio compartido               | N/A               |
+| `common-application`      | Contratos y utilidades compartidas entre servicios                                                | Utilidades de aplicación         | N/A               |
+| `order-domain-core`       | Entidades, lógica de negocio, eventos del dominio puro                                            | Núcleo del dominio               | N/A               |
+| `order-application-service`| Servicios de aplicación, orquestación, lógica de negocio, coordinación de SAGA                   | Application Service              | **Input Port**    |
+| `order-application`       | Controladores REST y validación, entrada al sistema                                                | Adaptador primario               | **Input Adapter** |
+| `order-dataaccess`        | Implementación de repositorios, mapeadores, JPA, Outbox                                           | Adaptador secundario             | **Output Adapter**|
+| `order-messaging`         | Publicación y consumo de eventos Kafka con Avro                                                   | Adaptador secundario             | **Output Adapter**|
+| `order-container`         | Módulo ejecutable con `@SpringBootApplication`, configuración, ensamblaje de beans               | Composición final                | N/A               |
 
 ---
 
@@ -52,68 +52,77 @@ Se basa en dividir la aplicación en **núcleo de dominio + adaptadores externos
 [Cliente HTTP]
       |
       v
-order-application (Controller)
+order-application (OrderController)
       |
       v
-order-application-service (caso de uso = Application Service)
+order-application-service (caso de uso / SAGA)
       |
       v
-order-domain-core (Order, OrderItem, lógica de negocio)
+order-domain-core (entidades y lógica de negocio)
       |
       v
-Ports de salida → Repositorios → order-dataaccess
-                → Publishers    → order-messaging
+Output Ports
+    ├──> Repositorios → order-dataaccess
+    └──> Eventos Outbox → order-messaging
 ```
 
-El `order-container` se encarga de arrancar y conectar todos los componentes con Spring Boot.
+---
+
+## 🧠 Elementos clave
+
+| Elemento                      | Qué es                                                                                                | Ejemplo en el proyecto                          |
+|-------------------------------|---------------------------------------------------------------------------------------------------------|--------------------------------------------------|
+| **Entidades**                 | Modelos con identidad y reglas propias                                                                 | `Order`, `OrderItem`                            |
+| **Value Objects (VO)**        | Clases inmutables que encapsulan valores con significado                                               | `Money`, `OrderId`, `StreetAddress`             |
+| **Aggregate Root**            | Entidad principal de un agregado                                                                       | `Order`                                          |
+| **Domain Event**              | Evento de negocio que describe algo que ocurrió                                                         | `OrderCreatedEvent`, `OrderCancelledEvent`       |
+| **Input Port**                | Interfaz que define cómo invocar al dominio desde fuera                                                 | `OrderApplicationService`                        |
+| **Output Port**               | Interfaz que define lo que necesita el dominio de infraestructura externa                              | `OrderRepository`, `PaymentRequestMessagePublisher` |
+| **Input Adapter**             | Implementación de un Input Port (REST Controller, Kafka Listener)                                      | `OrderController`, `PaymentResponseKafkaListener`|
+| **Output Adapter**            | Implementación de un Output Port (JPA, Kafka Publisher)                                                 | `OrderRepositoryImpl`, `OrderPaymentEventKafkaPublisher` |
+| **Application Service**       | Orquesta entidades, repositorios, y publishers. Coordina reglas y lógica                               | `OrderCreateCommandHandler`, `OrderPaymentSaga` |
 
 ---
 
-## 🧠 Explicación de los elementos clave
+## 🔄 Patrón SAGA + Outbox
 
-| Elemento                      | Qué es                                                                                                  | Ejemplo real en el proyecto                    |
-|-------------------------------|-----------------------------------------------------------------------------------------------------------|------------------------------------------------|
-| **Entidades**                 | Modelos de negocio con identidad y reglas de negocio propias                                              | `Order`, `Product`, `OrderItem`                |
-| **Objetos de valor (VO)**     | Clases inmutables que encapsulan un valor con contexto                                                    | `Money`, `StreetAddress`, `OrderId`            |
-| **Aggregate Root**            | Entidad principal de un agregado que orquesta sus entidades hijas                                        | `Order`                                        |
-| **Evento de dominio**         | Representa algo que ha pasado en el negocio (no técnico)                                                  | `OrderCreatedEvent`, `OrderPaidEvent`          |
-| **Input Port**                | Interfaz que define cómo se puede interactuar con el dominio desde fuera                                  | `OrderApplicationService`                      |
-| **Output Port**               | Interfaz que define lo que necesita el dominio de capas externas                                          | `OrderRepository`, `OrderCreatedMessagePublisher` |
-| **Adaptador de entrada**      | Implementa un input port, suele ser un Controller o un Listener                                          | `OrderController`                              |
-| **Adaptador de salida**       | Implementa un output port, como un repositorio JPA o publicador Kafka                                     | `OrderRepositoryImpl`, `KafkaPublisher`        |
-| **Servicio de aplicación**    | Orquesta reglas de negocio, llama entidades, repositorios, publishers                                     | `OrderCreateHelper`, `OrderCommandHandler`     |
+Este microservicio usa el patrón **SAGA** para coordinar operaciones distribuidas, y el patrón **Transactional Outbox** para publicar eventos de forma fiable.
+
+- Se usan **entidades Outbox** (`PaymentOutboxEntity`, `ApprovalOutboxEntity`)
+- El dominio genera un evento (`OrderCreatedEvent`) y lo pasa al servicio de aplicación
+- El evento se **almacena en la outbox**, y luego es publicado por un scheduler externo a Kafka
 
 ---
 
-## 📐 Patrón de eventos y transacciones
+## 📤 Kafka Messaging
 
-El dominio devuelve eventos (como `OrderCreatedEvent`), pero **no los publica directamente**.  
-Esto permite:
+El módulo `order-messaging`:
 
-- Primero guardar el estado (pedido) en base de datos.
-- Luego publicar el evento, asegurando consistencia.
-
-Hay dos formas de hacerlo:
-
-1. 📦 Usar **un publisher explícito** en el service de aplicación (`OrderCreatedPaymentRequestMessagePublisher`)
-2. 📢 Usar `@TransactionalEventListener` con un `ApplicationEventPublisher`
-
-El curso usa ambos como ejemplo, pero continúa con el primero.
+- Escucha eventos desde `payment-service` y `restaurant-service` usando `@KafkaListener`
+- Publica eventos del dominio (`OrderCreatedEvent`, etc.) hacia otros servicios usando Kafka
+- Utiliza modelos Avro serializados generados desde `.avsc`
 
 ---
 
-## 📦 El `pom.xml` principal
+## 🪛 Composición y ejecución
 
-- Tiene `<packaging>pom</packaging>` (no genera código).
-- Agrupa todos los submódulos en `<modules>`.
-- Contiene versiones compartidas y dependencias comunes (Lombok, Spring, etc.)
+El módulo `order-container`:
+
+- Contiene `OrderServiceApplication` con `@SpringBootApplication`
+- Define `BeanConfiguration` con los ensamblajes manuales de beans
+- Incluye `application.yml`, `init-schema.sql`, `logback-spring.xml`
+- Es el que se empaqueta como **JAR ejecutable**
 
 ---
 
-## ✅ Beneficios de este enfoque
+## ✅ Beneficios del enfoque
 
-- Separación clara de dominio / infraestructura.
-- Base de código **fácil de testear**.
-- Independencia tecnológica (podemos cambiar Kafka, base de datos, etc.).
-- Reutilización en múltiples microservicios.
-- Totalmente alineado con Clean Architecture y Hexagonal Architecture.
+- Separación de responsabilidades clara
+- Independencia tecnológica (DB, Kafka, Avro, REST...)
+- Testeo fácil del dominio sin necesidad de infraestructura
+- Escalabilidad y mantenibilidad
+- Compatible con microservicios, despliegues Docker/Kubernetes, y CI/CD
+
+---
+
+Este proyecto ejemplifica cómo aplicar **Arquitectura Hexagonal**, **DDD**, **SAGA** y **Clean Architecture** en un entorno real de microservicios Java.

@@ -1,95 +1,95 @@
-# Módulo `order-domain`
+# 🧠 Módulo `order-domain`
 
-> El módulo `order-domain` representa la lógica del dominio del microservicio de pedidos. Este módulo se divide en dos submódulos que implementan los principios de DDD y Arquitectura Hexagonal:
-
-- [`order-domain-core`](./order-domain-core/readme.md): contiene la lógica central del dominio, como entidades, objetos de valor, eventos y servicios de dominio.
-- [`order-application-service`](./order-application-service/readme.md): implementa los casos de uso del dominio. Es la puerta de entrada a la lógica de negocio desde fuera (input ports).
+> Este módulo actúa como un **contenedor lógico y estructural (POM)** que agrupa la lógica del dominio del microservicio de pedidos.
+> Implementa los principios de **Domain-Driven Design (DDD)** y **Arquitectura Hexagonal**, separando el núcleo del dominio y la lógica de aplicación.
 
 ---
 
-## `order-domain-core`
+## 📦 Submódulos incluidos
 
-Este submódulo representa el corazón del dominio. Todo su código está libre de dependencias externas o frameworks como Spring.
-
-### Paquetes principales
-
-#### `entity`
-- **Order**: Raíz del agregado. Coordina los `OrderItems`, el `TrackingId`, `OrderStatus`, y `StreetAddress`.
-- **OrderItem**: Entidad que representa un artículo de pedido.
-- **Customer**: Entidad básica para verificar existencia del cliente.
-- **Restaurant**: Entidad usada para validar disponibilidad de productos y estado.
-- **Product**: Entidad asociada a cada `OrderItem` para validar precios y nombres.
-
-#### `valueobject`
-- `OrderItemId`, `StreetAddress`, `TrackingId`: objetos de valor inmutables.
-
-#### `event`
-- `OrderCreatedEvent`, `OrderPaidEvent`, `OrderCancelledEvent`: eventos de dominio generados por la entidad `Order`.
-- `OrderEvent`: clase base abstracta que encapsula `Order` y `createdAt`.
-
-#### `exception`
-- `OrderDomainException`, `OrderNotFoundException`: excepciones propias del dominio.
-
-#### `OrderDomainService`
-Interfaz que define los casos de uso del dominio:
-- `validateAndInitiateOrder(...)`
-- `payOrder(...)`
-- `approveOrder(...)`
-- `cancelOrderPayment(...)`
-- `cancelOrder(...)`
-
-`OrderDomainServiceImpl` implementa esta interfaz y orquesta los agregados para ejecutar las reglas de negocio.
+- [`order-domain-core`](./order-domain-core/readme.md): contiene el **núcleo del dominio**, como entidades, objetos de valor, eventos y servicios de dominio. No tiene dependencias externas.
+- [`order-application-service`](./order-application-service/readme.md): implementa los **casos de uso del dominio**. Expone los puertos de entrada (input ports), coordina lógica, mapea datos y orquesta flujos con SAGA y outbox.
 
 ---
 
-## `order-application-service`
+## 🧱 Arquitectura
 
-Este submódulo representa la capa de aplicación. Es responsable de:
-- Orquestar la ejecución de los servicios de dominio.
-- Transformar DTOs en entidades del dominio.
-- Aplicar validaciones externas (Bean Validation).
-- Ejecutar operaciones transaccionales.
+Este módulo sigue una estructura basada en **Clean Architecture** y **Hexagonal Architecture**, donde:
 
-### Paquetes principales
+- `order-domain-core` representa el **dominio puro**, independiente de frameworks.
+- `order-application-service` actúa como una capa de orquestación, coordinando lógica de negocio y conectándose con el resto del sistema mediante **puertos y adaptadores**.
 
-#### `dto`
+---
+
+## 📁 Detalle de submódulos
+
+### 🔹 `order-domain-core`
+
+Contiene los bloques fundamentales del modelo de dominio:
+
+#### Entidades (`entity`)
+- `Order`: raíz del agregado. Coordina `OrderItem`, `TrackingId`, `OrderStatus`, etc.
+- `OrderItem`, `Product`, `Customer`, `Restaurant`
+
+#### Objetos de valor (`valueobject`)
+- `OrderItemId`, `StreetAddress`, `TrackingId`, `Money`, `OrderStatus`, etc.
+
+#### Eventos de dominio (`event`)
+- `OrderCreatedEvent`, `OrderPaidEvent`, `OrderCancelledEvent`
+
+#### Excepciones (`exception`)
+- `OrderDomainException`, `OrderNotFoundException`
+
+#### Servicios de dominio (`service`)
+- `OrderDomainService` y su implementación
+- Encapsulan reglas de negocio que afectan a múltiples entidades
+
+### 🔹 `order-application-service`
+
+Expone los **casos de uso** y coordina la lógica de negocio usando el dominio:
+
+#### DTOs (`dto`)
 - `CreateOrderCommand`, `CreateOrderResponse`
 - `TrackOrderQuery`, `TrackOrderResponse`
-- `PaymentResponse`, `RestaurantApprovalResponse`
+- `CustomerModel`, `PaymentResponse`, `RestaurantApprovalResponse`
 
-#### `mapper`
-- `OrderDataMapper`: convierte entre DTOs y entidades del dominio.
+#### Mapper
+- `OrderDataMapper`: convierte entre DTOs y entidades
 
-#### `ports`
-- `input.service.OrderApplicationService`: interfaz de caso de uso.
-- `input.message.listener.payment.PaymentResponseMessageListener`
-- `input.message.listener.restaurantapproval.RestaurantApprovalResponseMessageListener`
-- `output.repository.OrderRepository`, `CustomerRepository`, `RestaurantRepository`
-- `output.message.publisher.*`: publicadores de eventos para servicios externos
+#### Puertos (`ports`)
+- **Input:**
+    - `OrderApplicationService`
+    - Listeners de Kafka: `CustomerMessageListener`, `PaymentResponseMessageListener`, `RestaurantApprovalResponseMessageListener`
+- **Output:**
+    - Repositorios: `OrderRepository`, `CustomerRepository`, `RestaurantRepository`
+    - Publicadores: `PaymentRequestMessagePublisher`, `RestaurantApprovalRequestMessagePublisher`
 
-#### Implementaciones
-- `OrderApplicationServiceImpl`: implementa `OrderApplicationService`, usa handlers para separar lógica.
-- `OrderCreateCommandHandler`, `OrderTrackCommandHandler`: coordinan flujo de datos, usan servicios, mapeadores y repositorios.
-- `OrderCreateHelper`: extrae la parte transaccional del caso de uso para garantizar que el evento se dispare solo si se guarda en DB.
-- `ApplicationDomainEventPublisher`: alternativa para publicar eventos al finalizar transacción.
+#### SAGA y Outbox
+- Coordinadores: `OrderApprovalSaga`, `OrderPaymentSaga`
+- Modelos de outbox: `OrderApprovalOutboxMessage`, `OrderPaymentOutboxMessage`
+- Schedulers: limpieza y publicación periódica de eventos desde la outbox
 
-#### Listeners
-- `PaymentResponseMessageListenerImpl`: escucha eventos de pago.
-- `RestaurantApprovalResponseMessageListenerImpl`: escucha eventos de aprobación de restaurante.
+#### Implementaciones clave
+- `OrderApplicationServiceImpl`
+- `OrderCreateCommandHandler`, `OrderTrackCommandHandler`
+- `OrderCreateHelper` (gestión transaccional de persistencia + eventos)
 
 ---
 
-## Resumen de flujo de creación de orden
+## 🔄 Flujo de creación de pedido
 
-1. Cliente envía `CreateOrderCommand`.
-2. `OrderApplicationServiceImpl` delega en `OrderCreateCommandHandler`.
-3. Se validan cliente y restaurante mediante sus repositorios.
+1. Se recibe `CreateOrderCommand` desde un controlador o mensaje.
+2. `OrderApplicationServiceImpl` lo procesa usando `OrderCreateCommandHandler`.
+3. Se validan cliente y restaurante.
 4. Se transforma el comando en entidad `Order`.
-5. Se llama a `OrderDomainService.validateAndInitiateOrder(...)`, que devuelve un `OrderCreatedEvent`.
-6. Se guarda el pedido.
-7. Se publica el evento (con `OrderCreatedPaymentRequestMessagePublisher`).
+5. Se llama a `OrderDomainService.validateAndInitiateOrder(...)`.
+6. Se persiste la orden.
+7. Se guarda un mensaje en outbox y se publica evento de creación.
 
 ---
 
-Este módulo encapsula completamente la lógica del dominio del pedido y sigue fielmente los principios de Clean Architecture y DDD, separando responsabilidades, respetando la inmutabilidad y garantizando consistencia.
+## ✅ Conclusión
 
+Este módulo encapsula completamente la **lógica de negocio** del dominio de pedidos. Aísla el conocimiento del dominio del resto del sistema y facilita pruebas, mantenibilidad y evolución futura.
+
+Es un claro ejemplo de cómo aplicar **DDD + Clean Architecture + SAGA + Outbox** de forma estructurada en un sistema de microservicios.
